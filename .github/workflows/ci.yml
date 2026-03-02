@@ -8,9 +8,29 @@ on:
   pull_request:
 
 jobs:
-  code-check-and-build:
+  changes:
     runs-on: ubuntu-latest
+    outputs:
+      rk3568_cluster: ${{ steps.filter.outputs.rk3568_cluster }}
+      xts_env: ${{ steps.filter.outputs.xts_env }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
+      - name: Detect changed paths
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            rk3568_cluster:
+              - 'rk3568_cluster/**'
+            xts_env:
+              - 'xts_env/**'
+
+  rk3568-cluster-check:
+    needs: changes
+    if: needs.changes.outputs.rk3568_cluster == 'true'
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,12 +45,36 @@ jobs:
         with:
           node-version: 20
           cache: pnpm
+          cache-dependency-path: rk3568_cluster/pnpm-lock.yaml
 
       - name: Install dependencies
+        working-directory: rk3568_cluster
         run: pnpm install --frozen-lockfile
 
       - name: Code check
+        working-directory: rk3568_cluster
         run: pnpm lint
 
       - name: Build
+        working-directory: rk3568_cluster
         run: pnpm build
+
+      - name: Verify rk3568_cluster image build
+        run: docker build -t rk3568_cluster:ci ./rk3568_cluster
+
+  xts-env-image-check:
+    needs: changes
+    if: needs.changes.outputs.xts_env == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Prepare offline dependencies
+        run: bash ./xts_env/scripts/prepare_offline_deps.sh
+
+      - name: Verify xts_env tdd-env image build
+        run: docker build --target tdd-env -t xts_env:tdd-env-ci ./xts_env
+
+      - name: Verify xts_env tdd-auto image build
+        run: docker build --target tdd-auto -t xts_env:tdd-auto-ci ./xts_env
