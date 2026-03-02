@@ -31,6 +31,7 @@ if [ $# -ne 1 ]; then
 fi
 
 IMAGE_DIR="$1"
+DEVICE_SN="${DEVICE_SN:-}"
 
 # 检查目录
 if [ ! -d "$IMAGE_DIR" ]; then
@@ -57,13 +58,44 @@ check_files() {
 }
 
 # 等待设备进入Loader模式
+loader_output() {
+    sudo "${UPGRADE_TOOL}" ld 2>/dev/null || true
+}
+
+loader_device_ready() {
+    local output
+    output="$(loader_output)"
+
+    if [ -z "${output}" ]; then
+        return 1
+    fi
+
+    if [ -n "${DEVICE_SN}" ]; then
+        # 优先按指定序列号匹配；部分工具输出不带序列号时，单设备也允许通过。
+        if echo "${output}" | grep -qi "Loader" && echo "${output}" | grep -q "${DEVICE_SN}"; then
+            return 0
+        fi
+        if echo "${output}" | grep -qi "Loader"; then
+            local loader_count
+            loader_count="$(echo "${output}" | grep -ci "Loader" || true)"
+            if [ "${loader_count}" = "1" ]; then
+                echo "⚠️ 未在 Loader 输出中匹配到序列号 ${DEVICE_SN}，但仅检测到单设备 Loader，继续执行。"
+                return 0
+            fi
+        fi
+        return 1
+    fi
+
+    echo "${output}" | grep -qi "Loader"
+}
+
 wait_for_loader() {
     echo "等待设备进入Loader模式..."
     local max_retries=60
     local retry_count=0
     
     while [ $retry_count -lt $max_retries ]; do
-        if sudo "${UPGRADE_TOOL}" ld 2>/dev/null | grep -q "Loader"; then
+        if loader_device_ready; then
             echo "✅ 设备已进入Loader模式"
             return 0
         fi
@@ -85,13 +117,21 @@ reboot_to_loader() {
     # 尝试使用hdc
     if command -v hdc &> /dev/null; then
         echo "使用hdc重启..."
-        hdc shell reboot loader 2>/dev/null && return 0
+        if [ -n "${DEVICE_SN}" ]; then
+            hdc -t "${DEVICE_SN}" shell reboot loader 2>/dev/null && return 0
+        else
+            hdc shell reboot loader 2>/dev/null && return 0
+        fi
     fi
     
     # 尝试使用adb
     if command -v adb &> /dev/null; then
         echo "使用adb重启..."
-        adb reboot bootloader 2>/dev/null && return 0
+        if [ -n "${DEVICE_SN}" ]; then
+            adb -s "${DEVICE_SN}" reboot bootloader 2>/dev/null && return 0
+        else
+            adb reboot bootloader 2>/dev/null && return 0
+        fi
     fi
     
     # 如果都无法重启，提示手动操作
@@ -139,6 +179,9 @@ flash_image() {
 main() {
     echo "🚀 刷机脚本 - 带重试机制"
     echo "镜像目录: $IMAGE_DIR"
+    if [ -n "${DEVICE_SN}" ]; then
+        echo "指定设备序列号: ${DEVICE_SN}"
+    fi
     echo ""
     
     # 检查文件

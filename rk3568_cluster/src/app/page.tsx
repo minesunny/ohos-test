@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { type PipelineRun, type PipelineRunStatus } from "@/types/pipeline";
+import { type Rk3568ServerClientState, type Rk3568ServerDeviceState } from "@/types/rk3568-client";
 import { type Rk3568TestTask } from "@/types/rk3568";
 
 type PullRequestItem = {
@@ -123,6 +124,12 @@ type Rk3568TaskDetailResponse = {
   log?: string;
 };
 
+type Rk3568DevicesResponse = {
+  clientWsUrl: string;
+  clients: Rk3568ServerClientState[];
+  devices: Rk3568ServerDeviceState[];
+};
+
 type RealtimeConfigResponse = {
   url: string;
   port: number;
@@ -193,6 +200,18 @@ const RK3568_STATUS_STYLES: Record<Rk3568TestTask["status"], string> = {
   running: "state-rk-running",
   success: "state-rk-success",
   failed: "state-rk-failed",
+};
+
+const RK3568_DEVICE_STATUS_LABELS: Record<Rk3568ServerDeviceState["status"], string> = {
+  online: "在线",
+  offline: "离线",
+  unknown: "未知",
+};
+
+const RK3568_DEVICE_STATUS_STYLES: Record<Rk3568ServerDeviceState["status"], string> = {
+  online: "border-emerald-300 bg-emerald-50 text-emerald-700",
+  offline: "border-zinc-300 bg-zinc-100 text-zinc-600",
+  unknown: "border-amber-300 bg-amber-50 text-amber-700",
 };
 
 type RkProgressStatus = "pending" | "running" | "success" | "failed";
@@ -980,6 +999,12 @@ export default function Home() {
   const [rkDialogRun, setRkDialogRun] = React.useState<PipelineRun | null>(null);
   const [rkDialogPr, setRkDialogPr] = React.useState<{ number: number; title: string } | null>(null);
   const [rkTestCaseName, setRkTestCaseName] = React.useState("");
+  const [rkRequestedDeviceSerial, setRkRequestedDeviceSerial] = React.useState("");
+  const [rkClientWsUrl, setRkClientWsUrl] = React.useState("");
+  const [rkClients, setRkClients] = React.useState<Rk3568ServerClientState[]>([]);
+  const [rkDevices, setRkDevices] = React.useState<Rk3568ServerDeviceState[]>([]);
+  const [rkDevicesLoading, setRkDevicesLoading] = React.useState(false);
+  const [rkDevicesError, setRkDevicesError] = React.useState<string | null>(null);
   const [rkSubmitting, setRkSubmitting] = React.useState(false);
   const [rkRerunSubmitting, setRkRerunSubmitting] = React.useState(false);
   const [rkTasks, setRkTasks] = React.useState<Rk3568TestTask[]>([]);
@@ -1040,6 +1065,23 @@ export default function Home() {
     }
     return rkTasks.find((task) => task.id === rkSelectedTaskId) || null;
   }, [rkSelectedTaskId, rkTasks]);
+
+  const rkOnlineDevices = React.useMemo(
+    () => rkDevices.filter((device) => device.status === "online"),
+    [rkDevices],
+  );
+
+  const rkAvailableDevices = React.useMemo(
+    () => rkDevices.filter((device) => device.status === "online" && !device.occupiedByTaskId),
+    [rkDevices],
+  );
+
+  const rkSelectedDeviceState = React.useMemo(() => {
+    if (!rkRequestedDeviceSerial) {
+      return null;
+    }
+    return rkDevices.find((device) => device.serial === rkRequestedDeviceSerial) || null;
+  }, [rkDevices, rkRequestedDeviceSerial]);
 
   const canRerunSelectedTask = Boolean(
     rkSelectedTask
@@ -1358,6 +1400,44 @@ export default function Home() {
     return () => window.clearTimeout(timer);
   }, [notice]);
 
+  const loadRkDevices = React.useCallback(
+    async (options?: { silent?: boolean }) => {
+      if (!options?.silent) {
+        setRkDevicesLoading(true);
+      }
+      try {
+        const payload = await fetchJson<Rk3568DevicesResponse>("/api/rk3568-devices");
+        const clients = payload.clients || [];
+        const devices = payload.devices || [];
+        setRkClientWsUrl(payload.clientWsUrl || "");
+        setRkClients(clients);
+        setRkDevices(devices);
+        setRkDevicesError(null);
+        setRkRequestedDeviceSerial((current) => {
+          if (!current) {
+            return "";
+          }
+          const found = devices.find((device) => device.serial === current);
+          if (!found || found.status !== "online" || found.occupiedByTaskId) {
+            return "";
+          }
+          return current;
+        });
+      } catch (loadError) {
+        setRkDevicesError(normalizeClientError(loadError));
+        if (!options?.silent) {
+          setRkClients([]);
+          setRkDevices([]);
+        }
+      } finally {
+        if (!options?.silent) {
+          setRkDevicesLoading(false);
+        }
+      }
+    },
+    [],
+  );
+
   const loadRkTasks = React.useCallback(
     async (params: { prNumber: number; pipelineUrl?: string }) => {
       const query = new URLSearchParams({
@@ -1384,6 +1464,30 @@ export default function Home() {
     },
     [selectedTarget],
   );
+
+  React.useEffect(() => {
+    if (!rkDialogOpen) {
+      return;
+    }
+
+    let active = true;
+    const load = async (options?: { silent?: boolean }) => {
+      if (!active) {
+        return;
+      }
+      await loadRkDevices(options);
+    };
+
+    void load();
+    const timer = window.setInterval(() => {
+      void load({ silent: true });
+    }, 5000);
+
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [loadRkDevices, rkDialogOpen]);
 
   React.useEffect(() => {
     if (!rkDialogOpen || !rkDialogPr?.number) {
@@ -1746,6 +1850,8 @@ export default function Home() {
       title: pr.title,
     });
     setRkTestCaseName("");
+    setRkRequestedDeviceSerial("");
+    setRkDevicesError(null);
     setRkTasks([]);
     setRkSelectedTaskId(null);
     setRkTaskLog("");
@@ -1760,6 +1866,12 @@ export default function Home() {
     setRkDialogRun(null);
     setRkDialogPr(null);
     setRkTestCaseName("");
+    setRkRequestedDeviceSerial("");
+    setRkClientWsUrl("");
+    setRkClients([]);
+    setRkDevices([]);
+    setRkDevicesLoading(false);
+    setRkDevicesError(null);
     setRkTasks([]);
     setRkSelectedTaskId(null);
     setRkTaskLog("");
@@ -1826,6 +1938,19 @@ export default function Home() {
       return;
     }
 
+    const selectedSerial = rkRequestedDeviceSerial.trim();
+    if (selectedSerial) {
+      const selectedDevice = rkDevices.find((device) => device.serial === selectedSerial);
+      if (!selectedDevice) {
+        setError("所选设备不存在，请刷新设备列表后重试。");
+        return;
+      }
+      if (selectedDevice.status !== "online" || selectedDevice.occupiedByTaskId) {
+        setError("所选设备当前不可用，请重新选择可用设备。");
+        return;
+      }
+    }
+
     setRkSubmitting(true);
     setError(null);
 
@@ -1840,6 +1965,7 @@ export default function Home() {
           repositoryName: repository.repo,
           testType: "tdd",
           testCaseName: rkTestCaseName.trim() || undefined,
+          requestedDeviceSerial: selectedSerial || undefined,
         }),
       });
 
@@ -1854,7 +1980,7 @@ export default function Home() {
     } finally {
       setRkSubmitting(false);
     }
-  }, [loadRkTasks, repository, rkDialogPr, rkDialogRun, rkTestCaseName]);
+  }, [loadRkTasks, repository, rkDialogPr, rkDialogRun, rkDevices, rkRequestedDeviceSerial, rkTestCaseName]);
 
   const handleRkRerun = React.useCallback(async () => {
     if (!rkSelectedTask || !rkDialogPr) {
@@ -2485,12 +2611,100 @@ export default function Home() {
                   </label>
                 </div>
 
+                <label className="grid gap-1">
+                  <span className="text-[11px] text-zinc-600">指定设备（可选）</span>
+                  <select
+                    value={rkRequestedDeviceSerial}
+                    onChange={(event) => setRkRequestedDeviceSerial(event.target.value)}
+                    className="h-8 rounded border border-zinc-300 bg-white px-2 text-xs text-zinc-800 disabled:cursor-not-allowed disabled:bg-zinc-50"
+                    disabled={rkDevicesLoading && rkDevices.length === 0}
+                  >
+                    <option value="">
+                      自动分配（在线可用 {rkAvailableDevices.length} / 在线 {rkOnlineDevices.length}）
+                    </option>
+                    {rkDevices.map((device) => {
+                      const disabled = device.status !== "online" || Boolean(device.occupiedByTaskId);
+                      const occupied = device.occupiedByTaskId ? `占用:${device.occupiedByTaskId.slice(0, 8)}` : "空闲";
+                      return (
+                        <option key={`${device.clientId}:${device.serial}`} value={device.serial} disabled={disabled}>
+                          {device.serial} · {device.clientName} · {RK3568_DEVICE_STATUS_LABELS[device.status]} · {occupied}
+                        </option>
+                      );
+                    })}
+                  </select>
+                  {rkSelectedDeviceState && (
+                    <span className="text-[10px] text-zinc-500">
+                      当前选择: {rkSelectedDeviceState.serial} ({rkSelectedDeviceState.clientName})
+                    </span>
+                  )}
+                  {!rkSelectedDeviceState && rkRequestedDeviceSerial && (
+                    <span className="text-[10px] text-rose-600">所选设备当前不可用，已回退到自动分配。</span>
+                  )}
+                </label>
+
                 <p className="text-[11px] text-zinc-600">
                   任务将自动执行：解析并下载 dayu200 镜像 + dayu200_tdd 用例、覆盖
                   <code className="px-1">/home/maien/TDD/tests</code>、执行烧录与
                   <code className="px-1">run -t UT</code>（可选
                   <code className="px-1">-ts 用例名</code>）。
                 </p>
+
+                <div className="rounded-md border border-zinc-200 bg-zinc-50 p-2">
+                  <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-[11px] font-semibold text-zinc-700">设备状态</p>
+                    <div className="flex items-center gap-2 text-[10px] text-zinc-500">
+                      {rkDevicesLoading && <span>刷新中...</span>}
+                      <span>客户端 {rkClients.length}</span>
+                      <span>在线设备 {rkOnlineDevices.length}</span>
+                      <span>可用设备 {rkAvailableDevices.length}</span>
+                    </div>
+                  </div>
+
+                  {rkClientWsUrl && (
+                    <p className="truncate text-[10px] text-zinc-500">
+                      Client WS: <code className="px-1">{rkClientWsUrl}</code>
+                    </p>
+                  )}
+
+                  {rkDevicesError && (
+                    <p className="mt-1 rounded border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] text-rose-700">
+                      {rkDevicesError}
+                    </p>
+                  )}
+
+                  {rkDevices.length === 0 ? (
+                    <p className="mt-1 text-[10px] text-zinc-500">暂无客户端上报设备，任务会保持排队等待。</p>
+                  ) : (
+                    <div className="mt-1 max-h-28 space-y-1 overflow-auto pr-0.5">
+                      {rkDevices.map((device) => (
+                        <div
+                          key={`${device.clientId}:${device.serial}`}
+                          className="flex items-center justify-between rounded border border-zinc-200 bg-white px-2 py-1"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate text-[10px] text-zinc-700">{device.serial}</p>
+                            <p className="truncate text-[10px] text-zinc-500">
+                              {device.clientName} · 更新于 {formatDate(device.updatedAt)}
+                            </p>
+                          </div>
+                          <div className="ml-2 flex items-center gap-1">
+                            <span
+                              className={cn(
+                                "rounded-full border px-1.5 py-0.5 text-[10px]",
+                                RK3568_DEVICE_STATUS_STYLES[device.status],
+                              )}
+                            >
+                              {RK3568_DEVICE_STATUS_LABELS[device.status]}
+                            </span>
+                            <span className="rounded-full border border-zinc-300 bg-zinc-100 px-1.5 py-0.5 text-[10px] text-zinc-600">
+                              {device.occupiedByTaskId ? `占用:${device.occupiedByTaskId.slice(0, 8)}` : "空闲"}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
@@ -2541,6 +2755,22 @@ export default function Home() {
                           <p className="truncate text-[10px] text-zinc-500" title={task.message || "-"}>
                             {task.message || "-"}
                           </p>
+                          <p
+                            className="truncate text-[10px] text-zinc-500"
+                            title={
+                              task.assignedDeviceSerial
+                                ? `执行设备 ${task.assignedDeviceSerial} (${task.assignedClientName || task.assignedClientId || "-"})`
+                                : (task.requestedDeviceSerial
+                                  ? `指定设备 ${task.requestedDeviceSerial}`
+                                  : "自动分配设备")
+                            }
+                          >
+                            {task.assignedDeviceSerial
+                              ? `执行设备: ${task.assignedDeviceSerial} (${task.assignedClientName || task.assignedClientId || "-"})`
+                              : (task.requestedDeviceSerial
+                                ? `指定设备: ${task.requestedDeviceSerial}`
+                                : "设备: 自动分配")}
+                          </p>
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           <span
@@ -2566,6 +2796,19 @@ export default function Home() {
                         <p className="text-[10px] text-zinc-500">
                           {rkSelectedTask ? (rkSelectedTask.message || RK3568_STATUS_LABELS[rkSelectedTask.status]) : "请选择任务查看执行进度"}
                         </p>
+                        {rkSelectedTask && (
+                          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] text-zinc-500">
+                            <span className="rounded border border-zinc-300 bg-white px-1.5 py-0.5">
+                              请求设备: {rkSelectedTask.requestedDeviceSerial || "自动分配"}
+                            </span>
+                            <span className="rounded border border-zinc-300 bg-white px-1.5 py-0.5">
+                              执行设备: {rkSelectedTask.assignedDeviceSerial || "-"}
+                            </span>
+                            <span className="rounded border border-zinc-300 bg-white px-1.5 py-0.5">
+                              执行客户端: {rkSelectedTask.assignedClientName || rkSelectedTask.assignedClientId || "-"}
+                            </span>
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-1.5">
                         <Button

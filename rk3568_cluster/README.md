@@ -12,6 +12,13 @@
 - 支持账户级 GitCode 设置（Token、多仓库列表）
 - 搜索支持 owner 与仓库名分开输入
 
+## 架构拆分
+
+- `server/`：服务端职责（任务编排、设备分配、日志聚合）
+- `client/`：设备代理职责（设备注册、状态上报、测试执行）
+
+> 当前服务端主应用代码仍在仓库根目录（Next.js），`server/` 目录用于承载 server 角色说明与后续迁移。
+
 ## 技术栈
 
 - Next.js (App Router)
@@ -44,12 +51,13 @@ cp .env.example .env.local
 - `GITCODE_REPO`: 单仓库兼容配置（当未配置 `GITCODE_TARGETS` 时使用）
 - `GITCODE_TOKEN`: GitCode 访问令牌（GitCode OpenAPI 网关要求，查询和触发都需要）
 - `GITCODE_API_BASE`: 可选，默认 `https://api.gitcode.com/api/v5`
-- `RK3568_BASE_DIR`: 可选，默认 `/home/maien/TDD`
-- `RK3568_FLASH_SCRIPT`: 可选，默认 `~/ark-standalone-build/flash.sh`
 - `REALTIME_WS_PORT`: 可选，默认 `3765`（页面数据和 RK3568 日志 websocket 推送端口）
 - `REALTIME_WS_HOST`: 可选，默认 `0.0.0.0`
 - `REALTIME_WS_PUBLIC_HOST`: 可选，默认自动取当前页面 host
 - `NEXT_PUBLIC_REALTIME_WS_URL`: 可选，前端直连 websocket 地址（配置后优先使用）
+- `RK3568_CLIENT_WS_PORT`: 可选，默认 `3770`（server 与 client 的控制通道端口）
+- `RK3568_CLIENT_WS_HOST`: 可选，默认 `0.0.0.0`
+- `RK3568_CLIENT_WS_PUBLIC_HOST` / `RK3568_CLIENT_WS_PUBLIC_URL`: 可选，用于生成 client 连接地址
 - `DCP_AUTHORIZATION` / `DCP_COOKIE` / `DCP_TOKEN`: 可选，DCP 页面需要鉴权时用于抓取产物地址与下载
 
 页面支持通过搜索栏分别输入 `owner` 与仓库名，查询并切换到对应仓库的 PR 与构建历史。
@@ -142,16 +150,23 @@ DOCKER_CONFIG=/tmp/.docker docker build -t rk3568_cluster:latest .
 - 测试类型：当前仅支持 `TDD`
 - 测试用例名：可选；不填则执行 TDD 全量（`run -t UT`）
 
-后端会按顺序执行：
+server 与 client 协同流程：
 
-- 优先从流水线 event API 提取并下载 `Artifacts-dayu200-...tar.gz` 与 `Artifacts-dayu200_tdd-...tar.gz`（失败时回退 runlist 页面解析）
-- 产物下载带缓存：优先复用 `RK3568_ARTIFACT_CACHE_DIR`（默认 `/home/maien/TDD/.rk3568-artifact-cache`）中的缓存文件；缓存缺失时自动重新下载并写入缓存
-- 若缓存缺失但历史任务已有相同产物 URL 的归档文件，会优先复用历史任务归档并回填缓存
-- 下载到 `/home/maien/TDD/dayu200/<任务子目录>` 并解压
-- 覆盖 `/home/maien/TDD/tests`
-- 执行烧录命令 `~/ark-standalone-build/flash.sh <镜像目录>`
-- 在 `/home/maien/TDD/testfwk_developer_test` 下自动驱动 `./start.sh`，执行 `run -t UT`（可选 `-ts <用例>`）
-- `start.sh` 输出和任务日志会通过 websocket 实时推送到页面日志面板
+1. `client` 启动后通过 WebSocket 向 `server` 注册，并周期上报 `hdc` 设备列表状态。
+2. `server` 创建 RK3568 任务时，从已注册且可用的设备中分配一个设备并标记为占用。
+3. `server` 将任务派发给对应 `client`。
+4. `client` 解析流水线产物、优先命中本地缓存下载镜像与用例，准备挂载目录。
+5. `client` 为每个任务启动一次 `xts_env/docker-compose.env.yml` 容器执行刷机与测试（刷机脚本使用 `DEVICE_SN` 指定设备序列号）。
+6. `client` 持续通过 WebSocket 回传任务日志与状态，任务结束后 `server` 释放设备占用。
+
+## 启动 client
+
+```bash
+cd client
+cp .env.example .env
+pnpm install
+pnpm start
+```
 
 ## 主要 API
 
@@ -164,6 +179,7 @@ DOCKER_CONFIG=/tmp/.docker docker build -t rk3568_cluster:latest .
 - `GET /api/rk3568-tests?target=owner/repo&prNumber=123` 查询 RK3568 测试任务
 - `POST /api/rk3568-tests` 创建 RK3568 测试任务
 - `POST /api/rk3568-tests/:id/rerun` 基于已有任务参数重新创建并执行任务（配合下载缓存可快速重跑）
+- `GET /api/rk3568-devices` 查询已注册 client 与设备占用状态（含 client ws 地址）
 - `GET /api/realtime/ws` 初始化 websocket 地址（前端据此建立实时连接）
 
 ## 注意事项

@@ -3,6 +3,8 @@
 .next
 node_modules
 .pnpm-store
+client/node_modules
+client/runtime
 
 npm-debug.log*
 yarn-debug.log*

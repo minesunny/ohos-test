@@ -31,6 +31,7 @@ export async function POST(request: NextRequest, context: RouteContext) {
       prNumber: sourceTask.prNumber,
       pipelineUrl: sourceTask.pipelineUrl,
       testCaseName: sourceTask.testCaseName,
+      requestedDeviceSerial: sourceTask.requestedDeviceSerial,
     });
 
     enqueueRk3568Task(rerunTask.id);

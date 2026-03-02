@@ -22,6 +22,12 @@ export type Rk3568TestTask = {
   finishedAt?: string;
   taskDir: string;
   logPath: string;
+  requestedDeviceSerial?: string;
+  assignedClientId?: string;
+  assignedClientName?: string;
+  assignedDeviceSerial?: string;
+  executionMode?: "remote-client";
+  dispatchedAt?: string;
   imageArtifactUrl?: string;
   tddArtifactUrl?: string;
   imageArchivePath?: string;

@@ -1,0 +1,13 @@
+{
+  "name": "rk3568-client-agent",
+  "version": "0.1.0",
+  "private": true,
+  "description": "RK3568 client agent for device registration and task execution",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "ws": "^8.19.0"
+  }
+}

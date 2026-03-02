@@ -18,6 +18,7 @@ type StartRk3568Body = {
   repositoryName?: string;
   testType?: "tdd";
   testCaseName?: string;
+  requestedDeviceSerial?: string;
 };
 
 function parsePositiveInt(input: string | null | undefined): number | undefined {
@@ -165,6 +166,7 @@ export async function POST(request: NextRequest) {
       prNumber: resolvedPrNumber,
       pipelineUrl,
       testCaseName: body.testCaseName,
+      requestedDeviceSerial: body.requestedDeviceSerial,
     });
 
     enqueueRk3568Task(task.id);
