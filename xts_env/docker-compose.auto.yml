@@ -1,0 +1,64 @@
+name: tdd_auto
+
+services:
+  tdd-auto:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: tdd-auto
+    image: ohos-tdd-auto:latest
+    container_name: ohos-tdd-auto
+    network_mode: host
+    privileged: true
+    stdin_open: true
+    tty: true
+    command: ["run"]
+    environment:
+      # 工作目录与挂载路径
+      WORK_ROOT: /workspace
+      TDD_ROOT: /workspace/TDD
+      TEST_CASES_DIR: ${TEST_CASES_DIR:-/workspace/tests}
+      TEST_IMAGE_DIR: ${TEST_IMAGE_DIR:-/workspace/images}
+      REPORTS_DIR: ${REPORTS_DIR:-/workspace/TDD/testfwk_developer_test/reports}
+      DOWNLOAD_ROOT: ${DOWNLOAD_ROOT:-/workspace/downloads}
+
+      # 测试执行参数
+      PRODUCT_FORM: ${PRODUCT_FORM:-rk3568}
+      DEVICE_IP: ${DEVICE_IP:-}
+      DEVICE_PORT: ${DEVICE_PORT:-8710}
+      DEVICE_SN: ${DEVICE_SN:-}
+      TEST_MODULE: ${TEST_MODULE:-}
+      TEST_SUITE_NAME: ${TEST_SUITE_NAME:-}
+
+      # 仓库准备策略（Slim 模式建议保持 1）
+      PREPARED_REPOS_ONLY: ${PREPARED_REPOS_ONLY:-1}
+
+      # 自动下载参数（tdd-auto 主用）
+      RK3568_IMAGE_URL: ${RK3568_IMAGE_URL:-}
+      TDD_CASES_URL: ${TDD_CASES_URL:-}
+      HDC_URL: ${HDC_URL:-}
+      HDC_BINARY_PATH: ${HDC_BINARY_PATH:-}
+
+      # 仓库来源
+      DEV_REPO_URL: ${DEV_REPO_URL:-https://gitcode.com/openharmony/testfwk_developer_test.git}
+      XDEVICE_REPO_URL: ${XDEVICE_REPO_URL:-https://gitcode.com/openharmony/testfwk_xdevice.git}
+      DEV_REPO_BRANCH: ${DEV_REPO_BRANCH:-}
+      XDEVICE_REPO_BRANCH: ${XDEVICE_REPO_BRANCH:-}
+      DEV_REPO_COMMIT: ${DEV_REPO_COMMIT:-359ee0ff6224bd609858a2ab02b6c492e777ac0c}
+      XDEVICE_REPO_COMMIT: ${XDEVICE_REPO_COMMIT:-05b7d77ec52f8b6b17e2741f989c32fcf12184e2}
+
+      # 代理配置（保留大小写两套，兼容不同工具）
+      http_proxy: ${http_proxy:-}
+      https_proxy: ${https_proxy:-}
+      ftp_proxy: ${ftp_proxy:-}
+      no_proxy: ${no_proxy:-}
+      HTTP_PROXY: ${HTTP_PROXY:-}
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      FTP_PROXY: ${FTP_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-}
+    volumes:
+      - ${TDD_HOST_DIR:-./TDD}:/workspace/TDD
+      - ${TEST_CASES_HOST_DIR:-./tests}:${TEST_CASES_DIR:-/workspace/tests}
+      - ${IMAGE_HOST_DIR:-./images}:${TEST_IMAGE_DIR:-/workspace/images}
+      - ${REPORTS_HOST_DIR:-./reports}:${REPORTS_DIR:-/workspace/TDD/testfwk_developer_test/reports}
+      - ${DOWNLOAD_HOST_DIR:-./downloads}:${DOWNLOAD_ROOT:-/workspace/downloads}

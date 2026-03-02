@@ -1,0 +1,12 @@
+{
+  "files": [
+    "xdevice==6.0.7.210",
+    "xdevice-devicetest==6.0.7.210",
+    "xdevice-ohos==6.0.7.210"
+  ],
+  "dependencies": [
+    "pyserial==3.5",
+    "paramiko==4.0.0",
+    "rsa==4.9.1"
+  ]
+}
