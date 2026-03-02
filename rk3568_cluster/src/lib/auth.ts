@@ -229,25 +229,68 @@ export function revokeSessionToken(token: string | undefined): void {
   db.prepare("DELETE FROM sessions WHERE token_hash = ?").run(hashSessionToken(token));
 }
 
-export function applySessionCookie(response: NextResponse, token: string): void {
+function parseBooleanLike(value: string | undefined): boolean | undefined {
+  const normalized = value?.trim().toLowerCase();
+  if (!normalized) {
+    return undefined;
+  }
+  if (["1", "true", "yes", "on"].includes(normalized)) {
+    return true;
+  }
+  if (["0", "false", "no", "off"].includes(normalized)) {
+    return false;
+  }
+  return undefined;
+}
+
+function shouldUseSecureCookie(request?: NextRequest): boolean {
+  const forced = parseBooleanLike(process.env.AUTH_COOKIE_SECURE);
+  if (forced !== undefined) {
+    return forced;
+  }
+
+  const forwardedProto = request?.headers
+    .get("x-forwarded-proto")
+    ?.split(",")[0]
+    ?.trim()
+    .toLowerCase();
+  if (forwardedProto === "https") {
+    return true;
+  }
+  if (forwardedProto === "http") {
+    return false;
+  }
+
+  const requestProtocol = request?.nextUrl.protocol.replace(":", "").toLowerCase();
+  if (requestProtocol === "https") {
+    return true;
+  }
+  if (requestProtocol === "http") {
+    return false;
+  }
+
+  return process.env.NODE_ENV === "production";
+}
+
+export function applySessionCookie(response: NextResponse, token: string, request?: NextRequest): void {
   response.cookies.set({
     name: SESSION_COOKIE_NAME,
     value: token,
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookie(request),
     path: "/",
     maxAge: SESSION_MAX_AGE_SECONDS,
   });
 }
 
-export function clearSessionCookie(response: NextResponse): void {
+export function clearSessionCookie(response: NextResponse, request?: NextRequest): void {
   response.cookies.set({
     name: SESSION_COOKIE_NAME,
     value: "",
     httpOnly: true,
     sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
+    secure: shouldUseSecureCookie(request),
     path: "/",
     maxAge: 0,
   });

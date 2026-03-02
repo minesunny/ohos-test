@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     revokeSessionToken(token);
 
     const response = NextResponse.json({ ok: true });
-    clearSessionCookie(response);
+    clearSessionCookie(response, request);
     return response;
   } catch (error) {
     return NextResponse.json(

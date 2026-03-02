@@ -75,10 +75,29 @@ docker build -t rk3568_cluster:latest .
 运行容器（将本地 `data/` 挂载到容器，持久化 sqlite 与运行记录）：
 
 ```bash
+# Ensure mounted data dir is writable by container user(uid=1001)
+mkdir -p data && chmod 777 data
+
 docker run --rm -p 3000:3000 \
   --env-file .env.local \
+  -e AUTH_COOKIE_SECURE=false \
   -v "$(pwd)/data:/app/data" \
   rk3568_cluster:latest
+```
+
+如果使用明文 HTTP（例如局域网 IP + 端口映射）访问，建议设置 `AUTH_COOKIE_SECURE=false`。
+
+使用 Docker Compose（宿主机端口固定 `80`）：
+
+```bash
+mkdir -p data
+PUID="$(id -u)" PGID="$(id -g)" docker compose up -d --build
+```
+
+停止并删除容器：
+
+```bash
+docker compose down
 ```
 
 如果需要走代理（示例为本机 `http://172.16.1.1:7890`）：

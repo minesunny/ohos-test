@@ -1,0 +1,17 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: rk3568_cluster:latest
+    container_name: rk3568_cluster
+    restart: unless-stopped
+    user: "${PUID:-1000}:${PGID:-1000}"
+    env_file:
+      - .env.local
+    environment:
+      AUTH_COOKIE_SECURE: "false"
+    ports:
+      - "80:3000"
+    volumes:
+      - ./data:/app/data

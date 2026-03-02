@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
 
     const token = createSessionForUser(result.value.id);
     const response = NextResponse.json({ user: result.value });
-    applySessionCookie(response, token);
+    applySessionCookie(response, token, request);
     return response;
   } catch (error) {
     return NextResponse.json(
