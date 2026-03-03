@@ -5,7 +5,13 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CONFIG_FILE="${CONFIG_FILE:-${ROOT_DIR}/wheels/offline_deps.json}"
 REQ_FILE="${REQ_FILE:-${ROOT_DIR}/requirements-offline.txt}"
 WHEELS_DIR="${WHEELS_DIR:-${ROOT_DIR}/wheels}"
-PYTHON_BIN="${PYTHON_BIN:-python3}"
+if [[ -n "${PYTHON_BIN:-}" ]]; then
+  PYTHON_BIN="${PYTHON_BIN}"
+elif command -v python3.10 >/dev/null 2>&1; then
+  PYTHON_BIN="python3.10"
+else
+  PYTHON_BIN="python3"
+fi
 DRY_RUN="${DRY_RUN:-0}"
 
 if [[ ! -f "${CONFIG_FILE}" ]]; then
@@ -66,6 +72,7 @@ PY
 mkdir -p "${WHEELS_DIR}"
 cp "${TMP_REQ_FILE}" "${REQ_FILE}"
 echo "[deps] Generated requirements file: ${REQ_FILE}"
+echo "[deps] Using python: ${PYTHON_BIN}"
 
 if [[ "${DRY_RUN}" == "1" ]]; then
   echo "[deps] DRY_RUN=1, skip download."
@@ -73,5 +80,8 @@ if [[ "${DRY_RUN}" == "1" ]]; then
 fi
 
 echo "[deps] Downloading offline dependencies to ${WHEELS_DIR}"
-"${PYTHON_BIN}" -m pip download --dest "${WHEELS_DIR}" -r "${TMP_REQ_FILE}"
+"${PYTHON_BIN}" -m pip download \
+  --ignore-installed \
+  --dest "${WHEELS_DIR}" \
+  -r "${TMP_REQ_FILE}"
 echo "[deps] Done."

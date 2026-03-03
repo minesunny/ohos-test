@@ -7,6 +7,9 @@
   "dependencies": [
     "pyserial==3.5",
     "paramiko==4.0.0",
-    "rsa==4.9.1"
+    "rsa==4.9.1",
+    "cryptography==46.0.5",
+    "cffi==2.0.0",
+    "pycparser==2.23"
   ]
 }
