@@ -4,7 +4,7 @@ const { createHash, randomUUID } = require("node:crypto");
 const fs = require("node:fs/promises");
 const os = require("node:os");
 const path = require("node:path");
-const WebSocket = require("ws");
+const WsLib = require("ws");
 
 function nowIso() {
   return new Date().toISOString();
@@ -254,7 +254,7 @@ function buildCurlHeaderArgs() {
   return args;
 }
 
-function execCurl(args, timeoutMs = 0, maxBuffer = 30 * 1024 * 1024) {
+function execCurl(args: string[], timeoutMs = 0, maxBuffer = 30 * 1024 * 1024): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     execFile(
       "curl",
@@ -375,7 +375,7 @@ async function downloadWithCache(url, destination, prefix, onLog) {
   await fs.copyFile(cachePath, destination);
 }
 
-function execShell(command, options = {}) {
+function execShell(command: string, options: { cwd?: string; timeoutMs?: number } = {}): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     execFile(
       "bash",
@@ -410,7 +410,16 @@ function emitBufferedLines(buffer, onLine) {
   return remaining;
 }
 
-function execStreaming(command, options = {}) {
+function execStreaming(
+  command: string,
+  options: {
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+    timeoutMs?: number;
+    onStdoutLine?: (line: string) => void;
+    onStderrLine?: (line: string) => void;
+  } = {},
+): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
     const child = spawn("bash", ["-lc", command], {
       cwd: options.cwd,
@@ -503,7 +512,7 @@ async function resolveImageDir(extractRoot) {
 }
 
 function sendJson(payload) {
-  if (!ws || ws.readyState !== WebSocket.OPEN) {
+  if (!ws || ws.readyState !== WsLib.OPEN) {
     return false;
   }
   try {
@@ -737,7 +746,7 @@ function handleServerMessage(raw) {
 
 function connectServer() {
   log(`connecting server: ${serverWsUrl}`);
-  ws = new WebSocket(serverWsUrl, {
+  ws = new WsLib(serverWsUrl, {
     handshakeTimeout: 15000,
   });
 

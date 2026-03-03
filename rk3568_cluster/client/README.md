@@ -17,7 +17,7 @@
 cd client
 cp .env.example .env
 pnpm install
-node index.js
+pnpm start
 ```
 
 或：
