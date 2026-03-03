@@ -81,7 +81,6 @@ fi
 
 echo "[deps] Downloading offline dependencies to ${WHEELS_DIR}"
 "${PYTHON_BIN}" -m pip download \
-  --ignore-installed \
   --dest "${WHEELS_DIR}" \
   -r "${TMP_REQ_FILE}"
 echo "[deps] Done."
