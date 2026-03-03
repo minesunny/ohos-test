@@ -12,8 +12,6 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Client agent uses standalone Node.js style.
-    "client/**",
   ]),
 ]);
 

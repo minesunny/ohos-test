@@ -1,27 +1,34 @@
-# dependencies
+# root-level artifacts
 node_modules/
 .pnpm-store/
-
-# next.js build output
 .next/
-out/
-build/
 tsconfig.tsbuildinfo
+
+# server artifacts
+server/node_modules/
+server/.next/
+server/out/
+server/build/
+server/tsconfig.tsbuildinfo
+server/.env
+server/.env.local
+server/.env.*.local
+server/data/*.json
+server/data/*.sqlite
+server/data/*.sqlite-shm
+server/data/*.sqlite-wal
+!server/data/.gitkeep
+
+# client artifacts
+client/node_modules/
+client/dist/
+client/runtime/
+client/.env
+client/.env.local
+client/.env.*.local
 
 # logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-
-# local env
-.env
-.env.local
-.env.*.local
-
-# runtime data
-data/*.json
-data/*.sqlite
-data/*.sqlite-shm
-data/*.sqlite-wal
-!data/.gitkeep

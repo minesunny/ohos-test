@@ -19,8 +19,7 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"],
-      "@server/*": ["./server/src/*"]
+      "@/*": ["./src/*"]
     }
   },
   "include": [
@@ -31,5 +30,5 @@
     ".next/dev/types/**/*.ts",
     "**/*.mts"
   ],
-  "exclude": ["node_modules", "client/**"]
+  "exclude": ["node_modules"]
 }

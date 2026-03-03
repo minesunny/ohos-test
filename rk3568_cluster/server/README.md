@@ -1,27 +1,38 @@
 # RK3568 Server
 
-`server` 负责 GitCode 管理、任务编排、设备分配与日志聚合。
+`server` 是独立的 Next.js 应用，负责：
 
-当前 server 应用代码位于仓库根目录（Next.js App），`server` 目录用于承载服务端角色说明与后续拆分迁移。
-
-## server 职责
-
-- 维护 RK3568 任务队列
-- 管理 client 注册设备（可用/占用状态）
-- 为任务分配可用设备并下发执行指令
-- 接收 client 回传的实时日志和任务状态
+- GitCode PR 与流水线管理
+- RK3568 任务队列与设备分配
+- 通过 WebSocket 与 `client` 通信
+- 实时日志聚合与任务状态展示
 
 ## 运行
 
-在仓库根目录运行：
-
 ```bash
 pnpm install
+cp .env.example .env.local
 pnpm dev
 ```
 
-或在 `server/` 目录运行：
+访问：`http://localhost:3000`
+
+## 构建
 
 ```bash
-./start.sh
+pnpm lint
+pnpm build
 ```
+
+## Docker
+
+```bash
+docker build -t rk3568_cluster:latest .
+
+docker run --rm -p 3000:3000 \
+  --env-file .env.local \
+  -e AUTH_COOKIE_SECURE=false \
+  -v "$(pwd)/data:/app/data" \
+  rk3568_cluster:latest
+```
+

@@ -45,22 +45,22 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: rk3568_cluster/pnpm-lock.yaml
+          cache-dependency-path: rk3568_cluster/server/pnpm-lock.yaml
 
       - name: Install dependencies
-        working-directory: rk3568_cluster
+        working-directory: rk3568_cluster/server
         run: pnpm install --frozen-lockfile
 
       - name: Code check
-        working-directory: rk3568_cluster
+        working-directory: rk3568_cluster/server
         run: pnpm lint
 
       - name: Build
-        working-directory: rk3568_cluster
+        working-directory: rk3568_cluster/server
         run: pnpm build
 
       - name: Verify rk3568_cluster image build
-        run: docker build -t rk3568_cluster:ci ./rk3568_cluster
+        run: docker build -t rk3568_cluster:ci ./rk3568_cluster/server
 
   xts-env-image-check:
     needs: changes
