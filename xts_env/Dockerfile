@@ -60,10 +60,22 @@ COPY --from=compat-libs /usr/lib/x86_64-linux-gnu/libatomic.so.1.2.0 /usr/lib/x8
 COPY tools/hdc/hdc /opt/tools/hdc/hdc
 COPY tools/hdc/libusb_shared.so /opt/tools/hdc/libusb_shared.so
 COPY tools/flash/flash.sh /opt/tools/flash/flash.sh
-COPY tools/flash/upgrade_tool_v2.17_for_linux/upgrade_tool /opt/tools/flash/upgrade_tool_v2.17/upgrade_tool_v2.17_for_linux/upgrade_tool
+COPY tools/flash/upgrade_tool_v2.17.zip /opt/tools/flash/upgrade_tool_v2.17.zip
 COPY scripts/entrypoint.sh /usr/local/bin/tdd-entrypoint
 COPY scripts/configure_user_config.py /opt/tdd-tools/configure_user_config.py
 COPY scripts/download_and_unpack.py /opt/tdd-tools/download_and_unpack.py
+
+RUN python - <<'PY'
+from pathlib import Path
+import zipfile
+
+zip_path = Path("/opt/tools/flash/upgrade_tool_v2.17.zip")
+target_dir = Path("/opt/tools/flash/upgrade_tool_v2.17")
+target_dir.mkdir(parents=True, exist_ok=True)
+with zipfile.ZipFile(zip_path, "r") as zf:
+    zf.extractall(target_dir)
+zip_path.unlink(missing_ok=True)
+PY
 
 RUN chmod +x \
     /opt/tools/hdc/hdc \
