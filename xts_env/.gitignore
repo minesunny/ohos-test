@@ -5,3 +5,6 @@ downloads/
 images/
 reports/
 .docker-config/
+wheels/*
+!wheels/offline_deps.json
+tools/flash/upgrade_tool_v2.17_for_linux/

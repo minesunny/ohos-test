@@ -7,5 +7,4 @@ downloads/
 .env
 __pycache__/
 *.pyc
-tools/flash/upgrade_tool_v2.17.zip
-tools/flash/upgrade_tool_v2.17_for_linux/*.pdf
+tools/flash/upgrade_tool_v2.17_for_linux/

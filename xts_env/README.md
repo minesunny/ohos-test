@@ -16,7 +16,7 @@
 - `scripts/prepare_offline_deps.sh`：宿主机预下载 Python 离线依赖
 - `scripts/prepare_tdd_workspace.sh`：宿主机预拉取 TDD 框架仓库
 - `tools/hdc/`：从本地 SDK 复制的 `hdc` 与依赖库
-- `tools/flash/`：`flash.sh`、`upgrade_tool_v2.17_for_linux/upgrade_tool`
+- `tools/flash/`：`flash.sh`、`upgrade_tool_v2.17.zip`（构建时提取 `upgrade_tool`）
 - `wheels/offline_deps.json`：离线依赖配置（记录待下载文件与依赖）
 - `wheels/`：离线 Python 依赖下载目录（由脚本生成）
 

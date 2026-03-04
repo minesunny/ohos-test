@@ -61,12 +61,27 @@ COPY tools/ps/ps /bin/ps
 COPY tools/hdc/hdc /opt/tools/hdc/hdc
 COPY tools/hdc/libusb_shared.so /opt/tools/hdc/libusb_shared.so
 COPY tools/flash/flash.sh /opt/tools/flash/flash.sh
-COPY tools/flash/upgrade_tool_v2.17_for_linux/upgrade_tool /opt/tools/flash/upgrade_tool_v2.17/upgrade_tool_v2.17_for_linux/upgrade_tool
+COPY tools/flash/upgrade_tool_v2.17.zip /tmp/upgrade_tool_v2.17.zip
 COPY scripts/entrypoint.sh /usr/local/bin/tdd-entrypoint
 COPY scripts/configure_user_config.py /opt/tdd-tools/configure_user_config.py
 COPY scripts/download_and_unpack.py /opt/tdd-tools/download_and_unpack.py
 
-RUN chmod +x \
+RUN python - <<'PY'
+import zipfile
+from pathlib import Path
+
+archive_path = Path("/tmp/upgrade_tool_v2.17.zip")
+target_path = Path("/opt/tools/flash/upgrade_tool_v2.17/upgrade_tool_v2.17_for_linux/upgrade_tool")
+target_path.parent.mkdir(parents=True, exist_ok=True)
+
+with zipfile.ZipFile(archive_path) as archive:
+    with archive.open("upgrade_tool_v2.17_for_linux/upgrade_tool") as src, \
+            target_path.open("wb") as dst:
+        dst.write(src.read())
+PY
+
+RUN rm -f /tmp/upgrade_tool_v2.17.zip && \
+    chmod +x \
     /bin/ps \
     /opt/tools/hdc/hdc \
     /opt/tools/flash/flash.sh \
