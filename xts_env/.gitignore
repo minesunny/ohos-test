@@ -4,3 +4,4 @@ tests/
 downloads/
 images/
 reports/
+.docker-config/

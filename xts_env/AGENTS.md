@@ -19,8 +19,8 @@ This repository provides Dockerized OpenHarmony TDD execution with two service m
 ## Build, Test, and Development Commands
 - `./scripts/prepare_offline_deps.sh`: render requirements from `wheels/offline_deps.json` and download packages into `wheels/`.
 - `./scripts/prepare_tdd_workspace.sh`: prepare `TDD/testfwk_developer_test` and `TDD/xdevice` on host.
-- `docker compose -f docker-compose.env.yml build tdd-env`: build manual env image.
-- `docker compose -f docker-compose.auto.yml build tdd-auto`: build auto-run image.
+- `docker build -f Dockerfile --target tdd-env -t ohos-tdd-env:latest .`: build manual env image.
+- `docker build -f Dockerfile --target tdd-auto -t ohos-tdd-auto:latest .`: build auto-run image.
 - `docker compose -f docker-compose.env.yml up -d tdd-env`: start persistent environment container.
 - `docker compose -f docker-compose.env.yml exec tdd-env bash`: enter container and run tests manually.
 - `docker compose -f docker-compose.auto.yml run --rm tdd-auto`: auto-prepare and run suite (`run -p rk3568` default).

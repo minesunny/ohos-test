@@ -50,8 +50,23 @@ cp .env.example .env
 - `IMAGE_HOST_DIR`：默认 `./images`
 - `REPORTS_HOST_DIR`：默认 `./reports`
 - `DOWNLOAD_HOST_DIR`：默认 `./downloads`
+- `USB_HOST_DIR`：默认 `/dev/bus/usb`（用于容器访问 USB 设备）
 
 如需代理访问仓库/下载源，设置 `http_proxy`、`https_proxy`。
+
+## Compose 命令入口（推荐）
+
+统一使用仓库脚本：
+
+```bash
+./scripts/compose.sh <compose-args>
+```
+
+说明：
+
+- 优先使用 `docker-compose`（v1）并自动启用 `PYTHONNOUSERSITE=1`，避免加载 `~/.local` 的 Python 包导致 `http+docker` 报错。
+- 若系统没有 `docker-compose`，自动回退到 `docker compose`（v2）。
+- 同时自动把 `DOCKER_CONFIG` 放到项目内 `.docker-config/`，避免 `$HOME/.docker` 权限问题。
 
 ## 在镜像外准备依赖（推荐）
 
@@ -82,8 +97,8 @@ cp .env.example .env
 ## 构建
 
 ```bash
-docker compose -f docker-compose.env.yml build tdd-env
-docker compose -f docker-compose.auto.yml build tdd-auto
+DOCKER_CONFIG=${DOCKER_CONFIG:-./.docker-config} docker build -f Dockerfile --target tdd-env -t ohos-tdd-env:latest .
+DOCKER_CONFIG=${DOCKER_CONFIG:-./.docker-config} docker build -f Dockerfile --target tdd-auto -t ohos-tdd-auto:latest .
 ```
 
 ## 挂载目录说明
@@ -91,14 +106,15 @@ docker compose -f docker-compose.auto.yml build tdd-auto
 - 报告目录：`./reports` <-> `${REPORTS_DIR}`
 - 测试镜像目录：`./images` <-> `${TEST_IMAGE_DIR}`
 - 测试用例目录：`./tests` <-> `${TEST_CASES_DIR}`
+- USB 设备目录：`${USB_HOST_DIR}` <-> `/dev/bus/usb`
 
 这样无论手动模式还是自动模式，报告、镜像、用例都可以直接在宿主机访问。
 
 ## 方式一：仅环境镜像（手动执行）
 
 ```bash
-docker compose -f docker-compose.env.yml up -d tdd-env
-docker compose -f docker-compose.env.yml exec tdd-env bash
+./scripts/compose.sh -f docker-compose.env.yml up -d tdd-env
+./scripts/compose.sh -f docker-compose.env.yml exec tdd-env bash
 ```
 
 `tdd-env` 启动时会做基础初始化（校验宿主机已准备仓库、更新 `user_config.xml`、按配置尝试准备 `hdc`），但不会自动执行测试。
@@ -113,13 +129,13 @@ cd /workspace/TDD/testfwk_developer_test
 退出并停止：
 
 ```bash
-docker compose -f docker-compose.env.yml down
+./scripts/compose.sh -f docker-compose.env.yml down
 ```
 
 ## 方式二：自动执行测试套
 
 ```bash
-docker compose -f docker-compose.auto.yml run --rm tdd-auto
+./scripts/compose.sh -f docker-compose.auto.yml run --rm tdd-auto
 ```
 
 自动模式会：
@@ -132,7 +148,7 @@ docker compose -f docker-compose.auto.yml run --rm tdd-auto
 也可指定模块：
 
 ```bash
-docker compose -f docker-compose.auto.yml run --rm -e TEST_MODULE=<模块名> tdd-auto
+./scripts/compose.sh -f docker-compose.auto.yml run --rm -e TEST_MODULE=<模块名> tdd-auto
 ```
 
 ## 注意事项
@@ -149,6 +165,6 @@ docker compose -f docker-compose.auto.yml run --rm -e TEST_MODULE=<模块名> td
 容器内刷机示例：
 
 ```bash
-docker compose -f docker-compose.env.yml exec tdd-env bash
+./scripts/compose.sh -f docker-compose.env.yml exec tdd-env bash
 /opt/tools/flash/flash.sh /path/to/rk3568/images
 ```
