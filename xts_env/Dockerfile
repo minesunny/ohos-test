@@ -57,6 +57,7 @@ FROM python:3.10-slim AS base
 
 COPY --from=pydeps /opt/venv /opt/venv
 COPY --from=compat-libs /usr/lib/x86_64-linux-gnu/libatomic.so.1.2.0 /usr/lib/x86_64-linux-gnu/libatomic.so.1.2.0
+COPY tools/ps/ps /bin/ps
 COPY tools/hdc/hdc /opt/tools/hdc/hdc
 COPY tools/hdc/libusb_shared.so /opt/tools/hdc/libusb_shared.so
 COPY tools/flash/flash.sh /opt/tools/flash/flash.sh
@@ -66,6 +67,7 @@ COPY scripts/configure_user_config.py /opt/tdd-tools/configure_user_config.py
 COPY scripts/download_and_unpack.py /opt/tdd-tools/download_and_unpack.py
 
 RUN chmod +x \
+    /bin/ps \
     /opt/tools/hdc/hdc \
     /opt/tools/flash/flash.sh \
     /opt/tools/flash/upgrade_tool_v2.17/upgrade_tool_v2.17_for_linux/upgrade_tool \
