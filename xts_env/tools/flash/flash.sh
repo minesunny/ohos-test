@@ -23,6 +23,16 @@ if [ -z "${UPGRADE_TOOL}" ] || [ ! -x "${UPGRADE_TOOL}" ]; then
     exit 1
 fi
 
+run_with_priv() {
+    if [ "$(id -u)" -eq 0 ]; then
+        "$@"
+    elif command -v sudo >/dev/null 2>&1; then
+        sudo "$@"
+    else
+        "$@"
+    fi
+}
+
 # 参数检查
 if [ $# -ne 1 ]; then
     echo "用法: $0 <镜像目录>"
@@ -63,7 +73,7 @@ wait_for_loader() {
     local retry_count=0
     
     while [ $retry_count -lt $max_retries ]; do
-        if sudo "${UPGRADE_TOOL}" ld 2>/dev/null | grep -q "Loader"; then
+        if run_with_priv "${UPGRADE_TOOL}" ld 2>/dev/null | grep -q "Loader"; then
             echo "✅ 设备已进入Loader模式"
             return 0
         fi
@@ -115,7 +125,7 @@ flash_image() {
     while [ $retry_count -lt $max_retries ]; do
         echo "刷写 $file (尝试 $((retry_count + 1))/$max_retries)..."
         
-        if sudo "${UPGRADE_TOOL}" $cmd "${IMAGE_DIR}/${file}" 2>&1; then
+        if run_with_priv "${UPGRADE_TOOL}" $cmd "${IMAGE_DIR}/${file}" 2>&1; then
             echo "✅ $file 刷写成功"
             return 0
         fi
@@ -125,7 +135,7 @@ flash_image() {
         retry_count=$((retry_count + 1))
         
         # 检查设备是否还在
-        if ! sudo "${UPGRADE_TOOL}" ld 2>/dev/null | grep -q "Found"; then
+        if ! run_with_priv "${UPGRADE_TOOL}" ld 2>/dev/null | grep -q "Found"; then
             echo "设备连接丢失，尝试重新连接..."
             wait_for_loader || return 1
         fi
@@ -148,13 +158,13 @@ main() {
     # 确保在Loader模式
     echo ""
     echo "1. 确保设备在Loader模式..."
-    if ! sudo "${UPGRADE_TOOL}" ld 2>/dev/null | grep -q "Loader"; then
+    if ! run_with_priv "${UPGRADE_TOOL}" ld 2>/dev/null | grep -q "Loader"; then
         reboot_to_loader
         wait_for_loader || {
             echo "❌ 无法检测到Loader设备，请检查:"
             echo "  1. USB连接是否正常"
             echo "  2. 设备是否进入Loader模式"
-            echo "  3. 运行: sudo ${UPGRADE_TOOL} ld"
+            echo "  3. 运行: ${UPGRADE_TOOL} ld"
             exit 1
         }
     fi
@@ -213,7 +223,7 @@ main() {
     # 重启设备
     echo ""
     echo "4. 重启设备..."
-    if sudo "${UPGRADE_TOOL}" rd 2>&1; then
+    if run_with_priv "${UPGRADE_TOOL}" rd 2>&1; then
         echo "🎉 刷机完成！设备正在重启..."
     else
         echo "⚠️  重启命令发送失败，请手动重启设备"
