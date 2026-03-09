@@ -3,8 +3,8 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
-    image: rk3568_cluster:latest
-    container_name: rk3568_cluster
+    image: ohos-test-server:latest
+    container_name: ohos-test-server
     restart: unless-stopped
     user: "${PUID:-1000}:${PGID:-1000}"
     env_file:

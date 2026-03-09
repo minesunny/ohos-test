@@ -65,8 +65,8 @@ jobs:
         working-directory: server
         run: pnpm build
 
-      - name: Verify rk3568_cluster image build
-        run: docker build -t rk3568_cluster:ci ./server
+      - name: Verify ohos-test-server image build
+        run: docker build -t ohos-test-server:ci ./server
 
   xts-env-image-check:
     needs: changes

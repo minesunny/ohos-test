@@ -96,5 +96,9 @@ CMD ["/bin/bash"]
 
 FROM base AS tdd-auto
 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends git ca-certificates && \
+    rm -rf /var/lib/apt/lists/*
+
 ENTRYPOINT ["/usr/local/bin/tdd-entrypoint"]
 CMD ["run"]

@@ -27,11 +27,11 @@ pnpm build
 ## Docker
 
 ```bash
-docker build -t rk3568_cluster:latest .
+docker build -t ohos-test-server:latest .
 
 docker run --rm -p 3000:3000 \
   --env-file .env.local \
   -e AUTH_COOKIE_SECURE=false \
   -v "$(pwd)/../data:/app/data" \
-  rk3568_cluster:latest
+  ohos-test-server:latest
 ```

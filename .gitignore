@@ -43,3 +43,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+
+# xts_env artifacts
+xts_env/tools/flash/upgrade_tool_v*_for_linux/
+xts_env/wheels/*.whl
+xts_env/wheels/*.tar.gz

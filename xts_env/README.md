@@ -36,7 +36,8 @@ cp .env.example .env
 - `HDC_URL`：hdc 二进制或压缩包下载地址（可选）
 - `HDC_BINARY_PATH`：容器内已有 hdc/hdc_std 路径（可选）
 - `PRODUCT_FORM`：产品形态，默认 `rk3568`
-- `PREPARED_REPOS_ONLY`：默认 `1`，容器内不 clone，要求宿主机提前准备仓库
+- `PREPARED_REPOS_ONLY`：手动环境模式默认 `1`，容器内不 clone，要求宿主机提前准备仓库
+- `AUTO_PREPARED_REPOS_ONLY`：自动模式默认 `0`，允许容器在启动时自动 clone TDD 框架仓库
 - `DEVICE_IP` / `DEVICE_PORT` / `DEVICE_SN`：设备连接参数
 - `TEST_CASES_DIR`：容器内测试用例目录（默认 `/workspace/tests`）
 - `TEST_IMAGE_DIR`：容器内测试镜像目录（默认 `/workspace/images`）
@@ -126,8 +127,9 @@ docker compose -f docker-compose.auto.yml run --rm tdd-auto
 
 1. 按 `RK3568_IMAGE_URL` 下载镜像包到 `${DOWNLOAD_ROOT}/rk3568`，并同步到 `${TEST_IMAGE_DIR}`（可挂载到宿主机）
 2. 按 `TDD_CASES_URL` 下载用例包到 `${DOWNLOAD_ROOT}/tdd_cases`，并准备到 `${TEST_CASES_DIR}`（可挂载到宿主机）
-3. 根据 `TEST_SUITE_NAME` 过滤/准备测试用例目录
-4. 执行：`./start.sh run -p ${PRODUCT_FORM}`（若配置 `TEST_SUITE_NAME` 则自动追加 `-ts`）
+3. 默认自动 clone/校准 `testfwk_developer_test` 与 `xdevice` 到 `${TDD_ROOT}`；若要禁用，设置 `AUTO_PREPARED_REPOS_ONLY=1`
+4. 根据 `TEST_SUITE_NAME` 过滤/准备测试用例目录
+5. 执行：`./start.sh run -p ${PRODUCT_FORM}`（若配置 `TEST_SUITE_NAME` 则自动追加 `-ts`）
 
 也可指定模块：
 
@@ -142,7 +144,9 @@ docker compose -f docker-compose.auto.yml run --rm -e TEST_MODULE=<模块名> td
 - 镜像已内置 `hdc`（`/usr/local/bin/hdc`）和依赖库，刷机工具位于 `/opt/tools/flash/`，`flash.sh` 位于 `/opt/tools/flash/flash.sh`。
 - 主机侧也可直接使用 `tools/flash/flash.sh`；若未自动识别，手动设置 `UPGRADE_TOOL=<upgrade_tool路径>`。
 - 自动模式会按顺序尝试获取 `hdc`：`HDC_BINARY_PATH` -> `RK3568_IMAGE_URL` 下载包内查找 -> `HDC_URL` 下载并查找。
-- 默认 `PREPARED_REPOS_ONLY=1`，容器内不会 clone 仓库；请先执行 `./scripts/prepare_tdd_workspace.sh`。
+- `tdd-env` 默认 `PREPARED_REPOS_ONLY=1`，容器内不会 clone 仓库；请先执行 `./scripts/prepare_tdd_workspace.sh`。
+- `tdd-auto` 默认 `AUTO_PREPARED_REPOS_ONLY=0`，会在容器启动时自动准备 `TDD/`；如果你已经在宿主机准备好仓库，可设置 `AUTO_PREPARED_REPOS_ONLY=1`。
+- 自动执行型服务更适合使用 `docker compose run --rm tdd-auto`；旧版 `docker-compose up` 在容器快速退出时可能额外打印 Python traceback，这不是主故障点。
 - 为避免上游仓库变动导致不稳定，默认固定到指定 commit；只有你主动修改 `.env` 的 commit 变量才会切换版本。
 - `xdevice-aosp` 在当前可访问源不可用，镜像默认未安装。
 

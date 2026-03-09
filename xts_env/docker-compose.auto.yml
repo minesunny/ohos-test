@@ -1,4 +1,4 @@
-name: tdd_auto
+version: "3.8"
 
 services:
   tdd-auto:
@@ -30,8 +30,8 @@ services:
       TEST_MODULE: ${TEST_MODULE:-}
       TEST_SUITE_NAME: ${TEST_SUITE_NAME:-}
 
-      # 仓库准备策略（Slim 模式建议保持 1）
-      PREPARED_REPOS_ONLY: ${PREPARED_REPOS_ONLY:-1}
+      # 自动模式默认允许容器内 clone；如需强制依赖宿主机已准备仓库，设置为 1
+      PREPARED_REPOS_ONLY: ${AUTO_PREPARED_REPOS_ONLY:-0}
 
       # 自动下载参数（tdd-auto 主用）
       RK3568_IMAGE_URL: ${RK3568_IMAGE_URL:-}
