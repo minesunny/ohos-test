@@ -2,7 +2,18 @@
 node_modules/
 .pnpm-store/
 .next/
+.docker-config/
 tsconfig.tsbuildinfo
+.env
+.env.local
+.env.*.local
+data/*.json
+data/*.sqlite
+data/*.sqlite-shm
+data/*.sqlite-wal
+data/rk3568-tasks/
+data/rk3568-workspace/
+!data/.gitkeep
 
 # server artifacts
 server/node_modules/

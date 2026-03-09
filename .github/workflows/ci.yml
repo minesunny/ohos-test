@@ -23,7 +23,13 @@ jobs:
         with:
           filters: |
             rk3568_cluster:
-              - 'rk3568_cluster/**'
+              - 'AGENTS.md'
+              - 'README.md'
+              - '.gitignore'
+              - 'docker-compose.yml'
+              - 'data/.gitkeep'
+              - 'client/**'
+              - 'server/**'
             xts_env:
               - 'xts_env/**'
 
@@ -45,22 +51,22 @@ jobs:
         with:
           node-version: 22
           cache: pnpm
-          cache-dependency-path: rk3568_cluster/server/pnpm-lock.yaml
+          cache-dependency-path: server/pnpm-lock.yaml
 
       - name: Install dependencies
-        working-directory: rk3568_cluster/server
+        working-directory: server
         run: pnpm install --frozen-lockfile
 
       - name: Code check
-        working-directory: rk3568_cluster/server
+        working-directory: server
         run: pnpm lint
 
       - name: Build
-        working-directory: rk3568_cluster/server
+        working-directory: server
         run: pnpm build
 
       - name: Verify rk3568_cluster image build
-        run: docker build -t rk3568_cluster:ci ./rk3568_cluster/server
+        run: docker build -t rk3568_cluster:ci ./server
 
   xts-env-image-check:
     needs: changes

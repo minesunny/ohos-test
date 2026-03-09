@@ -1,11 +1,12 @@
 # rk3568_cluster
 
-`rk3568_cluster` 采用双目录结构：
+项目已直接展开在仓库根目录，不再额外套一层 `rk3568_cluster`：
 
 - `server/`：Next.js 服务端与 UI（PR 管理、任务编排、设备调度、实时日志）
 - `client/`：RK3568 设备代理（设备上报、任务执行、日志回传）
+- `data/`：运行时数据目录（SQLite、任务记录、缓存产物）
 
-根目录只保留编排文件，不放业务实现代码。
+仓库根目录同时保留 `docker-compose.yml`、说明文档和运行时目录。
 
 ## 启动 server
 
@@ -27,10 +28,10 @@ pnpm start
 
 ## Docker Compose（server）
 
-在 `rk3568_cluster` 根目录执行：
+在仓库根目录执行：
 
 ```bash
-mkdir -p server/data
+mkdir -p data
 docker compose up -d --build
 ```
 

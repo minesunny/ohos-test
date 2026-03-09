@@ -5,10 +5,11 @@
   - `server/src/app`: pages and API routes.
   - `server/src/lib`: core business logic (GitCode API, auth/session, SQLite access, pipeline parsing/sync, RK3568 scheduling).
   - `server/src/types`: shared TypeScript domain types.
-  - `server/data/`: runtime local storage (`auth.sqlite`, `pipeline-runs.json`, `rk3568-tests.json`).
 - `client/`: RK3568 device agent (TypeScript, Node.js runtime, websocket registration/report/execution).
+- `data/`: runtime local storage for compose/standalone deployments (`auth.sqlite`, `pipeline-runs.json`, `rk3568-tests.json`).
+- `server/data/`: placeholder directory used by image build and local dev fallback.
 - `docker-compose.yml`: root-level compose entry that builds/runs `server`.
-- `.github/workflows/ci.yml`: CI checks `rk3568_cluster/server` and image build verification.
+- `.github/workflows/ci.yml`: CI checks `server` and image build verification.
 
 ## Build, Test, and Development Commands
 - Server install: `pnpm -C server install`
@@ -49,4 +50,4 @@
 
 ## Security & Configuration Tips
 - Never commit real tokens/secrets; use `server/.env.local` and `client/.env` templates.
-- Treat `server/data/` as environment-specific runtime state; do not hardcode machine-specific paths outside config.
+- Treat `data/` as environment-specific runtime state; do not hardcode machine-specific paths outside config.
