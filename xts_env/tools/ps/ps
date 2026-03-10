@@ -1,0 +1,19 @@
+#!/bin/sh
+echo "UID PID PPID C STIME TTY TIME CMD"
+for p in /proc/[0-9]*; do
+    pid="${p#/proc/}"
+    [ -r "$p/status" ] || continue
+    ppid="$(sed -n 's/^PPid:[[:space:]]*//p' "$p/status" | head -n1)"
+    uid="$(sed -n 's/^Uid:[[:space:]]*//p' "$p/status" | head -n1 | awk '{print $1}')"
+    if [ "$uid" = "0" ]; then
+        user="root"
+    else
+        user="$uid"
+    fi
+    cmd="$(tr '\0' ' ' <"$p/cmdline" 2>/dev/null)"
+    if [ -z "$cmd" ] && [ -r "$p/comm" ]; then
+        cmd="$(cat "$p/comm" 2>/dev/null)"
+    fi
+    [ -n "$cmd" ] || continue
+    echo "$user $pid $ppid 0 ? ? ? $cmd"
+done

@@ -1,13 +1,6 @@
-version: "3.8"
-
 services:
   tdd-auto:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: tdd-auto
-    image: ohos-tdd-auto:latest
-    container_name: ohos-tdd-auto
+    image: ${OHOS_TDD_AUTO_IMAGE:-ohos-tdd-auto:latest}
     network_mode: host
     privileged: true
     stdin_open: true
@@ -30,8 +23,8 @@ services:
       TEST_MODULE: ${TEST_MODULE:-}
       TEST_SUITE_NAME: ${TEST_SUITE_NAME:-}
 
-      # 自动模式默认允许容器内 clone；如需强制依赖宿主机已准备仓库，设置为 1
-      PREPARED_REPOS_ONLY: ${AUTO_PREPARED_REPOS_ONLY:-0}
+      # 自动模式默认只使用镜像内置/宿主机已有仓库，不在容器内联网 clone
+      PREPARED_REPOS_ONLY: ${AUTO_PREPARED_REPOS_ONLY:-1}
 
       # 自动下载参数（tdd-auto 主用）
       RK3568_IMAGE_URL: ${RK3568_IMAGE_URL:-}

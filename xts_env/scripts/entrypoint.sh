@@ -49,6 +49,7 @@ ensure_repo_commit() {
   local repo_dir="$1"
   local commit="$2"
   local label="$3"
+  local branch="${4:-}"
 
   if [[ -z "${commit}" ]]; then
     return 0
@@ -59,7 +60,17 @@ ensure_repo_commit() {
 
   if ! git_repo "${repo_dir}" cat-file -e "${commit}^{commit}" 2>/dev/null; then
     log "Fetching ${label} commit ${commit}"
-    git_repo "${repo_dir}" fetch --depth 1 origin "${commit}"
+    if [[ -n "${branch}" ]]; then
+      git_repo "${repo_dir}" fetch --depth 200 origin "${branch}"
+    else
+      git_repo "${repo_dir}" fetch --depth 200 origin '+refs/heads/*:refs/remotes/origin/*'
+    fi
+  fi
+
+  if ! git_repo "${repo_dir}" cat-file -e "${commit}^{commit}" 2>/dev/null; then
+    log "Deepen ${label} history to reach commit ${commit}"
+    git_repo "${repo_dir}" fetch --unshallow origin || \
+      git_repo "${repo_dir}" fetch --depth 2000 origin '+refs/heads/*:refs/remotes/origin/*'
   fi
 
   local current_commit
@@ -82,18 +93,67 @@ ensure_xdevice_layout() {
   fi
 }
 
+copy_prepared_repo_if_needed() {
+  local source_dir="$1"
+  local target_dir="$2"
+  local label="$3"
+  local marker_path="${4:-}"
+
+  if [[ ! -d "${source_dir}" ]]; then
+    return
+  fi
+
+  if [[ -e "${target_dir}" && ! -d "${target_dir}" ]]; then
+    die "Path exists but is not a directory: ${target_dir}"
+  fi
+
+  if [[ ! -e "${target_dir}" ]]; then
+    mkdir -p "$(dirname "${target_dir}")"
+    cp -R "${source_dir}" "${target_dir}"
+    log "Seeded ${label} from image to ${target_dir}"
+    return
+  fi
+
+  if [[ -d "${target_dir}" ]] && [[ -z "$(ls -A "${target_dir}")" ]]; then
+    copy_dir_content "${source_dir}" "${target_dir}"
+    log "Seeded ${label} into empty directory ${target_dir}"
+    return
+  fi
+
+  if [[ -n "${marker_path}" ]] && [[ ! -e "${target_dir}/${marker_path}" ]]; then
+    copy_dir_content "${source_dir}" "${target_dir}"
+    log "Seeded ${label} into incomplete directory ${target_dir}"
+  fi
+}
+
+seed_prepared_frameworks() {
+  local tdd_root="$1"
+  local prepared_root="${PREPARED_TDD_ROOT:-/opt/tdd-prepared}"
+
+  copy_prepared_repo_if_needed \
+    "${prepared_root}/testfwk_developer_test" \
+    "${tdd_root}/testfwk_developer_test" \
+    "testfwk_developer_test" \
+    "start.sh"
+  copy_prepared_repo_if_needed \
+    "${prepared_root}/xdevice" \
+    "${tdd_root}/xdevice" \
+    "xdevice"
+  ensure_xdevice_layout "${tdd_root}"
+}
+
 ensure_prepared_frameworks() {
   local tdd_root="$1"
   local dev_repo_dir="${tdd_root}/testfwk_developer_test"
   local xdevice_dir="${tdd_root}/xdevice"
   local xdevice_alt_dir="${tdd_root}/testfwk_xdevice"
 
-  if [[ ! -d "${dev_repo_dir}" ]]; then
-    die "Missing ${dev_repo_dir}. Prepare repositories on host first (run scripts/prepare_tdd_workspace.sh)."
+  if [[ ! -d "${dev_repo_dir}" || ! -e "${dev_repo_dir}/start.sh" ]]; then
+    die "Missing ${dev_repo_dir}. Provide prepared repositories on host or rebuild image with baked TDD repositories."
   fi
 
   if [[ ! -d "${xdevice_dir}" && ! -d "${xdevice_alt_dir}" ]]; then
-    die "Missing xdevice repository under ${tdd_root}. Prepare repositories on host first (run scripts/prepare_tdd_workspace.sh)."
+    die "Missing xdevice repository under ${tdd_root}. Provide prepared repositories on host or rebuild image with baked TDD repositories."
   fi
 
   ensure_xdevice_layout "${tdd_root}"
@@ -106,16 +166,10 @@ prepare_framework_repos() {
   local xdevice_dir="${tdd_root}/xdevice"
   local xdevice_alt_dir="${tdd_root}/testfwk_xdevice"
 
+  seed_prepared_frameworks "${tdd_root}"
+
   if [[ "${prepared_only}" == "1" ]]; then
     ensure_prepared_frameworks "${tdd_root}"
-    if command -v git >/dev/null 2>&1; then
-      ensure_repo_commit "${dev_dir}" "${DEV_REPO_COMMIT}" "testfwk_developer_test"
-      if [[ -d "${xdevice_dir}/.git" ]]; then
-        ensure_repo_commit "${xdevice_dir}" "${XDEVICE_REPO_COMMIT}" "xdevice"
-      elif [[ -d "${xdevice_alt_dir}/.git" ]]; then
-        ensure_repo_commit "${xdevice_alt_dir}" "${XDEVICE_REPO_COMMIT}" "xdevice"
-      fi
-    fi
     return
   fi
 
@@ -126,7 +180,7 @@ prepare_framework_repos() {
   fi
 
   clone_repo "${DEV_REPO_URL}" "${dev_dir}" "${DEV_REPO_BRANCH}"
-  ensure_repo_commit "${dev_dir}" "${DEV_REPO_COMMIT}" "testfwk_developer_test"
+  ensure_repo_commit "${dev_dir}" "${DEV_REPO_COMMIT}" "testfwk_developer_test" "${DEV_REPO_BRANCH}"
   ensure_xdevice_layout "${tdd_root}"
 
   if [[ ! -d "${xdevice_dir}/.git" && ! -d "${xdevice_alt_dir}/.git" ]]; then
@@ -134,9 +188,9 @@ prepare_framework_repos() {
   fi
 
   if [[ -d "${xdevice_dir}/.git" ]]; then
-    ensure_repo_commit "${xdevice_dir}" "${XDEVICE_REPO_COMMIT}" "xdevice"
+    ensure_repo_commit "${xdevice_dir}" "${XDEVICE_REPO_COMMIT}" "xdevice" "${XDEVICE_REPO_BRANCH}"
   elif [[ -d "${xdevice_alt_dir}/.git" ]]; then
-    ensure_repo_commit "${xdevice_alt_dir}" "${XDEVICE_REPO_COMMIT}" "xdevice"
+    ensure_repo_commit "${xdevice_alt_dir}" "${XDEVICE_REPO_COMMIT}" "xdevice" "${XDEVICE_REPO_BRANCH}"
   fi
 
   ensure_prepared_frameworks "${tdd_root}"
@@ -153,7 +207,14 @@ download_payload() {
   fi
 
   echo "[tdd] Downloading ${label}: ${url}" >&2
-  result="$(python3 /opt/tdd-tools/download_and_unpack.py --url "${url}" --dest "${dest_dir}")"
+  if ! result="$(python3 /opt/tdd-tools/download_and_unpack.py --url "${url}" --dest "${dest_dir}")"; then
+    if result="$(find_existing_download_payload "${dest_dir}")"; then
+      echo "[tdd] Failed to download ${label}, fallback to existing payload: ${result}" >&2
+      printf "%s\n" "${result}"
+      return 0
+    fi
+    die "Failed to download ${label} from ${url}. Check DNS/proxy settings or pre-populate ${dest_dir}."
+  fi
   echo "[tdd] ${label} prepared at: ${result}" >&2
   printf "%s\n" "${result}"
 }
@@ -162,7 +223,34 @@ copy_dir_content() {
   local src_dir="$1"
   local dst_dir="$2"
   mkdir -p "${dst_dir}"
-  cp -a "${src_dir}/." "${dst_dir}/"
+  cp -R "${src_dir}/." "${dst_dir}/"
+}
+
+find_existing_download_payload() {
+  local dest_dir="$1"
+  local extracted_dir="${dest_dir}/extracted"
+  local child_count=""
+  local first_child=""
+  local archive_file=""
+
+  if [[ -d "${extracted_dir}" ]] && [[ -n "$(find "${extracted_dir}" -mindepth 1 -print -quit)" ]]; then
+    child_count="$(find "${extracted_dir}" -mindepth 1 -maxdepth 1 | wc -l | tr -d ' ')"
+    first_child="$(find "${extracted_dir}" -mindepth 1 -maxdepth 1 | head -n 1 || true)"
+    if [[ "${child_count}" == "1" && -d "${first_child}" ]]; then
+      printf "%s\n" "${first_child}"
+    else
+      printf "%s\n" "${extracted_dir}"
+    fi
+    return 0
+  fi
+
+  archive_file="$(find "${dest_dir}" -maxdepth 1 -type f | head -n 1 || true)"
+  if [[ -n "${archive_file}" ]]; then
+    printf "%s\n" "${archive_file}"
+    return 0
+  fi
+
+  return 1
 }
 
 link_hdc_binary() {

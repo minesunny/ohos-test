@@ -59,7 +59,34 @@ check_files() {
 
 # 等待设备进入Loader模式
 loader_output() {
-    sudo "${UPGRADE_TOOL}" ld 2>/dev/null || true
+    run_upgrade_tool ld 2>/dev/null || true
+}
+
+run_upgrade_tool() {
+    if [ "$(id -u)" = "0" ]; then
+        "${UPGRADE_TOOL}" "$@"
+        return
+    fi
+
+    if command -v sudo >/dev/null 2>&1; then
+        sudo "${UPGRADE_TOOL}" "$@"
+        return
+    fi
+
+    "${UPGRADE_TOOL}" "$@"
+}
+
+print_loader_diagnostics() {
+    echo "----- Loader diagnostics begin -----"
+    echo "[diag] upgrade_tool ld:"
+    run_upgrade_tool ld 2>&1 || true
+    echo "[diag] usb bus path:"
+    ls -ld /dev/bus/usb 2>&1 || true
+    echo "[diag] usb bus nodes sample:"
+    find /dev/bus/usb -maxdepth 2 -type c 2>/dev/null | head -n 10 || true
+    echo "[diag] udev runtime path:"
+    ls -ld /run/udev 2>&1 || true
+    echo "----- Loader diagnostics end -----"
 }
 
 loader_device_ready() {
@@ -155,7 +182,7 @@ flash_image() {
     while [ $retry_count -lt $max_retries ]; do
         echo "刷写 $file (尝试 $((retry_count + 1))/$max_retries)..."
         
-        if sudo "${UPGRADE_TOOL}" $cmd "${IMAGE_DIR}/${file}" 2>&1; then
+        if run_upgrade_tool $cmd "${IMAGE_DIR}/${file}" 2>&1; then
             echo "✅ $file 刷写成功"
             return 0
         fi
@@ -165,7 +192,7 @@ flash_image() {
         retry_count=$((retry_count + 1))
         
         # 检查设备是否还在
-        if ! sudo "${UPGRADE_TOOL}" ld 2>/dev/null | grep -q "Found"; then
+        if ! run_upgrade_tool ld 2>/dev/null | grep -q "Found"; then
             echo "设备连接丢失，尝试重新连接..."
             wait_for_loader || return 1
         fi
@@ -191,13 +218,15 @@ main() {
     # 确保在Loader模式
     echo ""
     echo "1. 确保设备在Loader模式..."
-    if ! sudo "${UPGRADE_TOOL}" ld 2>/dev/null | grep -q "Loader"; then
+    if ! run_upgrade_tool ld 2>/dev/null | grep -q "Loader"; then
         reboot_to_loader
         wait_for_loader || {
             echo "❌ 无法检测到Loader设备，请检查:"
             echo "  1. USB连接是否正常"
             echo "  2. 设备是否进入Loader模式"
-            echo "  3. 运行: sudo ${UPGRADE_TOOL} ld"
+            echo "  3. 运行: ${UPGRADE_TOOL} ld"
+            echo "  4. 容器内是否已挂载 /dev/bus/usb 和 /run/udev"
+            print_loader_diagnostics
             exit 1
         }
     fi
@@ -212,6 +241,7 @@ main() {
     sleep 3
     wait_for_loader || {
         echo "❌ 设备重连失败"
+        print_loader_diagnostics
         exit 1
     }
     
@@ -256,7 +286,7 @@ main() {
     # 重启设备
     echo ""
     echo "4. 重启设备..."
-    if sudo "${UPGRADE_TOOL}" rd 2>&1; then
+    if run_upgrade_tool rd 2>&1; then
         echo "🎉 刷机完成！设备正在重启..."
     else
         echo "⚠️  重启命令发送失败，请手动重启设备"

@@ -58,6 +58,7 @@ checkout_commit() {
   local repo_dir="$1"
   local commit="$2"
   local label="$3"
+  local branch="${4:-}"
 
   if [[ -z "${commit}" ]]; then
     return
@@ -68,7 +69,17 @@ checkout_commit() {
 
   if ! git_repo "${repo_dir}" cat-file -e "${commit}^{commit}" 2>/dev/null; then
     echo "[prep] fetching ${label} commit ${commit}"
-    git_repo "${repo_dir}" fetch --depth 1 origin "${commit}"
+    if [[ -n "${branch}" ]]; then
+      git_repo "${repo_dir}" fetch --depth 200 origin "${branch}"
+    else
+      git_repo "${repo_dir}" fetch --depth 200 origin '+refs/heads/*:refs/remotes/origin/*'
+    fi
+  fi
+
+  if ! git_repo "${repo_dir}" cat-file -e "${commit}^{commit}" 2>/dev/null; then
+    echo "[prep] deepen history for ${label} to reach ${commit}"
+    git_repo "${repo_dir}" fetch --unshallow origin || \
+      git_repo "${repo_dir}" fetch --depth 2000 origin '+refs/heads/*:refs/remotes/origin/*'
   fi
 
   local current_commit
@@ -95,16 +106,16 @@ fi
 
 mkdir -p "${TDD_ROOT}"
 clone_if_missing "${DEV_REPO_URL}" "${TDD_ROOT}/testfwk_developer_test" "${DEV_REPO_BRANCH}"
-checkout_commit "${TDD_ROOT}/testfwk_developer_test" "${DEV_REPO_COMMIT}" "testfwk_developer_test"
+checkout_commit "${TDD_ROOT}/testfwk_developer_test" "${DEV_REPO_COMMIT}" "testfwk_developer_test" "${DEV_REPO_BRANCH}"
 
 if [[ ! -d "${TDD_ROOT}/xdevice/.git" && ! -d "${TDD_ROOT}/testfwk_xdevice/.git" ]]; then
   clone_if_missing "${XDEVICE_REPO_URL}" "${TDD_ROOT}/xdevice" "${XDEVICE_REPO_BRANCH}"
 fi
 
 if [[ -d "${TDD_ROOT}/xdevice/.git" ]]; then
-  checkout_commit "${TDD_ROOT}/xdevice" "${XDEVICE_REPO_COMMIT}" "xdevice"
+  checkout_commit "${TDD_ROOT}/xdevice" "${XDEVICE_REPO_COMMIT}" "xdevice" "${XDEVICE_REPO_BRANCH}"
 elif [[ -d "${TDD_ROOT}/testfwk_xdevice/.git" ]]; then
-  checkout_commit "${TDD_ROOT}/testfwk_xdevice" "${XDEVICE_REPO_COMMIT}" "xdevice"
+  checkout_commit "${TDD_ROOT}/testfwk_xdevice" "${XDEVICE_REPO_COMMIT}" "xdevice" "${XDEVICE_REPO_BRANCH}"
 fi
 
 link_xdevice_layout
