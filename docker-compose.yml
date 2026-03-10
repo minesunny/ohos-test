@@ -1,9 +1,6 @@
 services:
   app:
-    build:
-      context: ./server
-      dockerfile: Dockerfile
-    image: ohos-test-server:latest
+    image: ${OHOS_TEST_SERVER_IMAGE:-ohos-test-server:latest}
     container_name: ohos-test-server
     restart: unless-stopped
     user: "${PUID:-1000}:${PGID:-1000}"

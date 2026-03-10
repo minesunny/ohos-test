@@ -32,7 +32,10 @@ pnpm start
 
 ```bash
 mkdir -p data
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 服务默认映射到宿主机 `80` 端口。
+
+如需指定镜像，可在执行前设置 `OHOS_TEST_SERVER_IMAGE`。

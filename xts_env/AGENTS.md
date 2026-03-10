@@ -9,7 +9,7 @@ This repository provides Dockerized OpenHarmony TDD execution with two service m
 - `scripts/entrypoint.sh`: runtime bootstrap (validate prepared repos, configure XML, run tests).
 - `scripts/configure_user_config.py`: updates `user_config.xml` for IP/port/SN/test paths.
 - `scripts/download_and_unpack.py`: fetches and extracts suite/image archives.
-- `scripts/prepare_tdd_workspace.sh`: clones required TDD framework repos on host.
+- `scripts/prepare_tdd_workspace.sh`: optionally clones required TDD framework repos on host.
 - `tools/hdc/`: bundled `hdc` binary and required shared library.
 - `tools/flash/`: bundled `flash.sh` and `upgrade_tool` package.
 - `wheels/offline_deps.json`: source-of-truth config for offline package download.
@@ -18,26 +18,26 @@ This repository provides Dockerized OpenHarmony TDD execution with two service m
 
 ## Build, Test, and Development Commands
 - `./scripts/prepare_offline_deps.sh`: render requirements from `wheels/offline_deps.json` and download packages into `wheels/`.
-- `./scripts/prepare_tdd_workspace.sh`: prepare `TDD/testfwk_developer_test` and `TDD/xdevice` on host.
-- `docker compose -f docker-compose.env.yml build tdd-env`: build manual env image.
-- `docker compose -f docker-compose.auto.yml build tdd-auto`: build auto-run image.
+- `./scripts/prepare_tdd_workspace.sh`: optionally prepare `TDD/testfwk_developer_test` and `TDD/xdevice` on host.
+- `docker compose -f docker-compose.env.yml pull tdd-env`: pull manual env image.
+- `docker compose -f docker-compose.auto.yml pull tdd-auto`: pull auto-run image.
 - `docker compose -f docker-compose.env.yml up -d tdd-env`: start persistent environment container.
 - `docker compose -f docker-compose.env.yml exec tdd-env bash`: enter container and run tests manually.
-- `docker compose -f docker-compose.auto.yml run --rm tdd-auto`: auto-prepare and run suite (`run -p rk3568` default).
+- `docker compose -f docker-compose.auto.yml run --rm tdd-auto`: seed baked TDD repos if needed, then run suite (`run -p rk3568` default).
 - `docker compose -f docker-compose.auto.yml run --rm tdd-auto run --help`: smoke-check non-interactive startup.
 - `docker compose -f docker-compose.env.yml exec tdd-env hdc -v`: verify bundled `hdc`.
 
 ## Coding Style & Naming Conventions
 - Shell: Bash with `set -euo pipefail`; use lowercase snake_case function names.
 - Python: PEP 8, 4-space indentation, explicit argument parsing, small helpers.
-- Keep environment variable names uppercase (`PRODUCT_FORM`, `TEST_SUITE_NAME`, `PREPARED_REPOS_ONLY`, `TEST_IMAGE_DIR`, `REPORTS_DIR`, `DEV_REPO_COMMIT`).
+- Keep environment variable names uppercase (`PRODUCT_FORM`, `TEST_SUITE_NAME`, `PREPARED_REPOS_ONLY`, `AUTO_PREPARED_REPOS_ONLY`, `TEST_IMAGE_DIR`, `REPORTS_DIR`, `DEV_REPO_COMMIT`).
 - Keep scripts idempotent so repeated container starts are safe.
 
 ## Testing Guidelines
 - Use smoke tests for wrapper changes (no dedicated unit test suite in this repo).
 - Minimum validation after changes:
-- `docker compose -f docker-compose.env.yml build tdd-env`
-- `docker compose -f docker-compose.auto.yml build tdd-auto`
+- `docker compose -f docker-compose.env.yml pull tdd-env`
+- `docker compose -f docker-compose.auto.yml pull tdd-auto`
 - `docker compose -f docker-compose.auto.yml run --rm tdd-auto run --help`
 - `docker compose -f docker-compose.env.yml exec tdd-env bash -lc 'hdc -v && test -x /opt/tools/flash/flash.sh'`
 

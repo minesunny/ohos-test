@@ -27,11 +27,11 @@ pnpm build
 ## Docker
 
 ```bash
-docker build -t ohos-test-server:latest .
+docker pull "${OHOS_TEST_SERVER_IMAGE:-ohos-test-server:latest}"
 
 docker run --rm -p 3000:3000 \
   --env-file .env.local \
   -e AUTH_COOKIE_SECURE=false \
   -v "$(pwd)/../data:/app/data" \
-  ohos-test-server:latest
+  "${OHOS_TEST_SERVER_IMAGE:-ohos-test-server:latest}"
 ```

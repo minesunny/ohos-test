@@ -44,6 +44,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# python artifacts
+__pycache__/
+*.py[cod]
+
 # xts_env artifacts
 xts_env/tools/flash/upgrade_tool_v*_for_linux/
 xts_env/wheels/*.whl

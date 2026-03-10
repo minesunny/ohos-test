@@ -8,7 +8,7 @@
 - `client/`: RK3568 device agent (TypeScript, Node.js runtime, websocket registration/report/execution).
 - `data/`: runtime local storage for compose/standalone deployments (`auth.sqlite`, `pipeline-runs.json`, `rk3568-tests.json`).
 - `server/data/`: placeholder directory used by image build and local dev fallback.
-- `docker-compose.yml`: root-level compose entry that builds/runs `server`.
+- `docker-compose.yml`: root-level compose entry that pulls/runs `server`.
 - `.github/workflows/ci.yml`: CI checks `server` and image build verification.
 
 ## Build, Test, and Development Commands
@@ -20,7 +20,7 @@
 - Client install: `pnpm -C client install`
 - Client build: `pnpm -C client run build`
 - Client start: `pnpm -C client start`
-- Compose up (server): `docker compose up -d --build`
+- Compose up (server): `docker compose pull && docker compose up -d`
 
 ## Coding Style & Naming Conventions
 - Language: TypeScript (`strict` enabled in `tsconfig.json`).
