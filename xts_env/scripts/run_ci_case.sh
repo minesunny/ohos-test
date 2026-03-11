@@ -24,13 +24,22 @@ usage() {
                                - https://.../workbench/cicd/detail/<event_id>/runlist
                                - https://.../api/codecheckAccess/ci-portal/v1/event/<event_id>
                                - <event_id>
-  --suite, --case <name>      指定测试套/用例名，执行时追加 -ts
-  --module <name>             指定模块名，执行时追加 -tm
+  -t, --task-type <type>      指定测试类型，默认 UT
+  -tp, --test-part <name>     指定部件，可独立使用
+  -tm, --module <name>        指定模块，需结合 -tp 使用
+  -ts, --suite <name>         指定测试套，可独立使用
+  -tc, --test-case <name>     指定测试用例，需结合 -ts 使用
+  -cov, --coverage <value>    覆盖率执行参数
+  -ra, --random <value>       C++ 用例乱序执行参数
+  -pd, --partdeps <value>     二级依赖部件执行参数
+  --repeat <count>            设置执行次数
+  -hl, --history-list <n>     显示最近 n 条历史记录
+  -rh, --run-history <n>      执行第 n 条历史记录
+  --retry                     重跑上次失败用例
   --device-sn <sn>            设备序列号
   --device-ip <ip>            设备 IP
   --device-port <port>        设备端口，默认 8710
   --product-form <name>       产品形态，默认 rk3568
-  --task-type <name>          任务类型，默认 UT
   --command <cmd>             自定义容器内执行命令，覆盖默认 start.sh 命令
   --skip-flash                跳过刷机，只执行测试命令
   -h, --help                  查看帮助
@@ -126,12 +135,21 @@ HOST_GID="$(id -g)"
 
 ci_ref=""
 product_form="${PRODUCT_FORM:-}"
-task_type="${TASK_TYPE:-UT}"
+task_type="${TASK_TYPE:-}"
+test_part="${TEST_PART:-}"
 device_ip="${DEVICE_IP:-}"
 device_port="${DEVICE_PORT:-}"
 device_sn="${DEVICE_SN:-}"
 test_module="${TEST_MODULE:-}"
 test_suite_name="${TEST_SUITE_NAME:-}"
+test_case_name="${TEST_CASE:-}"
+coverage_value="${TEST_COVERAGE:-}"
+random_value="${TEST_RANDOM:-}"
+partdeps_value="${TEST_PARTDEPS:-}"
+repeat_count="${TEST_REPEAT:-}"
+history_list="${TEST_HISTORYLIST:-}"
+run_history="${TEST_RUNHISTORY:-}"
+retry_mode="${TEST_RETRY:-}"
 custom_command=""
 skip_flash=0
 
@@ -141,15 +159,64 @@ while [[ "$#" -gt 0 ]]; do
       usage
       exit 0
       ;;
-    --suite|--case|--suite-name|--test-case)
+    -t|--task-type)
+      [[ "$#" -ge 2 ]] || die "Option $1 requires a value."
+      task_type="$2"
+      shift 2
+      ;;
+    -tp|--test-part|--part)
+      [[ "$#" -ge 2 ]] || die "Option $1 requires a value."
+      test_part="$2"
+      shift 2
+      ;;
+    -tm|--module|--test-module)
+      [[ "$#" -ge 2 ]] || die "Option $1 requires a value."
+      test_module="$2"
+      shift 2
+      ;;
+    -ts|--suite|--case|--suite-name|--test-suite)
       [[ "$#" -ge 2 ]] || die "Option $1 requires a value."
       test_suite_name="$2"
       shift 2
       ;;
-    --module|--test-module)
+    -tc|--test-case|--case-name|--test-case-name)
       [[ "$#" -ge 2 ]] || die "Option $1 requires a value."
-      test_module="$2"
+      test_case_name="$2"
       shift 2
+      ;;
+    -cov|--coverage)
+      [[ "$#" -ge 2 ]] || die "Option $1 requires a value."
+      coverage_value="$2"
+      shift 2
+      ;;
+    -ra|--random)
+      [[ "$#" -ge 2 ]] || die "Option $1 requires a value."
+      random_value="$2"
+      shift 2
+      ;;
+    -pd|--partdeps|--part-deps)
+      [[ "$#" -ge 2 ]] || die "Option $1 requires a value."
+      partdeps_value="$2"
+      shift 2
+      ;;
+    --repeat)
+      [[ "$#" -ge 2 ]] || die "Option $1 requires a value."
+      repeat_count="$2"
+      shift 2
+      ;;
+    -hl|--history-list)
+      [[ "$#" -ge 2 ]] || die "Option $1 requires a value."
+      history_list="$2"
+      shift 2
+      ;;
+    -rh|--run-history)
+      [[ "$#" -ge 2 ]] || die "Option $1 requires a value."
+      run_history="$2"
+      shift 2
+      ;;
+    --retry)
+      retry_mode=1
+      shift
       ;;
     --device-sn)
       [[ "$#" -ge 2 ]] || die "Option $1 requires a value."
@@ -169,11 +236,6 @@ while [[ "$#" -gt 0 ]]; do
     --product-form)
       [[ "$#" -ge 2 ]] || die "Option $1 requires a value."
       product_form="$2"
-      shift 2
-      ;;
-    --task-type)
-      [[ "$#" -ge 2 ]] || die "Option $1 requires a value."
-      task_type="$2"
       shift 2
       ;;
     --command)
@@ -237,6 +299,37 @@ compose_in_xts_env() {
     cd "${XTS_ENV_DIR}"
     "${COMPOSE_CMD[@]}" -p "${COMPOSE_PROJECT_NAME_EFFECTIVE}" -f "${COMPOSE_FILE}" "$@"
   )
+}
+
+is_positive_integer() {
+  [[ "$1" =~ ^[1-9][0-9]*$ ]]
+}
+
+is_truthy() {
+  case "${1,,}" in
+    1|true|yes|y|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+validate_test_selection_args() {
+  [[ -n "${custom_command}" ]] && return
+
+  if [[ -n "${test_module}" && -z "${test_part}" ]]; then
+    die "-tm/--module cannot be used without -tp/--test-part."
+  fi
+  if [[ -n "${test_case_name}" && -z "${test_suite_name}" ]]; then
+    die "-tc/--test-case cannot be used without -ts/--suite."
+  fi
+  if [[ -n "${repeat_count}" ]] && ! is_positive_integer "${repeat_count}"; then
+    die "--repeat must be a positive integer."
+  fi
+  if [[ -n "${history_list}" ]] && ! is_positive_integer "${history_list}"; then
+    die "-hl/--history-list must be a positive integer."
+  fi
+  if [[ -n "${run_history}" ]] && ! is_positive_integer "${run_history}"; then
+    die "-rh/--run-history must be a positive integer."
+  fi
 }
 
 container_compose_workdir() {
@@ -672,9 +765,19 @@ pairs = [
     ("DEVICE_IP", env.get("DEVICE_IP", "")),
     ("DEVICE_PORT", env.get("DEVICE_PORT", "")),
     ("DEVICE_SN", env.get("DEVICE_SN", "")),
+    ("TASK_TYPE", env.get("TASK_TYPE", "")),
+    ("TEST_PART", env.get("TEST_PART", "")),
     ("DEV_REPO_COMMIT", env.get("DEV_REPO_COMMIT", "")),
     ("TEST_MODULE", env.get("TEST_MODULE", "")),
     ("TEST_SUITE_NAME", env.get("TEST_SUITE_NAME", "")),
+    ("TEST_CASE", env.get("TEST_CASE", "")),
+    ("TEST_COVERAGE", env.get("TEST_COVERAGE", "")),
+    ("TEST_RANDOM", env.get("TEST_RANDOM", "")),
+    ("TEST_PARTDEPS", env.get("TEST_PARTDEPS", "")),
+    ("TEST_REPEAT", env.get("TEST_REPEAT", "")),
+    ("TEST_HISTORYLIST", env.get("TEST_HISTORYLIST", "")),
+    ("TEST_RUNHISTORY", env.get("TEST_RUNHISTORY", "")),
+    ("TEST_RETRY", env.get("TEST_RETRY", "")),
     ("TDD_HOST_DIR", mounts.get(tdd_root, "")),
     ("TEST_CASES_HOST_DIR", mounts.get(tests_dir, "")),
     ("IMAGE_HOST_DIR", mounts.get(images_dir, "")),
@@ -701,9 +804,19 @@ assign_context_from_container() {
       DEVICE_IP) CONTAINER_DEVICE_IP="${value}" ;;
       DEVICE_PORT) CONTAINER_DEVICE_PORT="${value}" ;;
       DEVICE_SN) CONTAINER_DEVICE_SN="${value}" ;;
+      TASK_TYPE) CONTAINER_TASK_TYPE="${value}" ;;
+      TEST_PART) CONTAINER_TEST_PART="${value}" ;;
       DEV_REPO_COMMIT) CONTAINER_DEV_REPO_COMMIT="${value}" ;;
       TEST_MODULE) CONTAINER_TEST_MODULE="${value}" ;;
       TEST_SUITE_NAME) CONTAINER_TEST_SUITE_NAME="${value}" ;;
+      TEST_CASE) CONTAINER_TEST_CASE="${value}" ;;
+      TEST_COVERAGE) CONTAINER_TEST_COVERAGE="${value}" ;;
+      TEST_RANDOM) CONTAINER_TEST_RANDOM="${value}" ;;
+      TEST_PARTDEPS) CONTAINER_TEST_PARTDEPS="${value}" ;;
+      TEST_REPEAT) CONTAINER_TEST_REPEAT="${value}" ;;
+      TEST_HISTORYLIST) CONTAINER_TEST_HISTORYLIST="${value}" ;;
+      TEST_RUNHISTORY) CONTAINER_TEST_RUNHISTORY="${value}" ;;
+      TEST_RETRY) CONTAINER_TEST_RETRY="${value}" ;;
       TDD_HOST_DIR) TDD_HOST_DIR="${value}" ;;
       TEST_CASES_HOST_DIR) TEST_CASES_HOST_DIR="${value}" ;;
       IMAGE_HOST_DIR) IMAGE_HOST_DIR="${value}" ;;
@@ -1173,11 +1286,38 @@ update_user_config_in_container() {
 
 build_default_test_command() {
   local cmd="./start.sh run -p $(shell_quote "${product_form}") -t $(shell_quote "${task_type}")"
+  if [[ -n "${test_part}" ]]; then
+    cmd+=" -tp $(shell_quote "${test_part}")"
+  fi
   if [[ -n "${test_module}" ]]; then
     cmd+=" -tm $(shell_quote "${test_module}")"
   fi
   if [[ -n "${test_suite_name}" ]]; then
     cmd+=" -ts $(shell_quote "${test_suite_name}")"
+  fi
+  if [[ -n "${test_case_name}" ]]; then
+    cmd+=" -tc $(shell_quote "${test_case_name}")"
+  fi
+  if [[ -n "${coverage_value}" ]]; then
+    cmd+=" -cov $(shell_quote "${coverage_value}")"
+  fi
+  if [[ -n "${random_value}" ]]; then
+    cmd+=" -ra $(shell_quote "${random_value}")"
+  fi
+  if [[ -n "${partdeps_value}" ]]; then
+    cmd+=" -pd $(shell_quote "${partdeps_value}")"
+  fi
+  if [[ -n "${repeat_count}" ]]; then
+    cmd+=" --repeat $(shell_quote "${repeat_count}")"
+  fi
+  if [[ -n "${history_list}" ]]; then
+    cmd+=" -hl $(shell_quote "${history_list}")"
+  fi
+  if [[ -n "${run_history}" ]]; then
+    cmd+=" -rh $(shell_quote "${run_history}")"
+  fi
+  if is_truthy "${retry_mode}"; then
+    cmd+=" --retry"
   fi
   printf '%s\n' "${cmd}"
 }
@@ -1256,9 +1396,20 @@ product_form="${product_form:-${CONTAINER_PRODUCT_FORM:-rk3568}}"
 device_ip="${device_ip:-${CONTAINER_DEVICE_IP:-}}"
 device_port="${device_port:-${CONTAINER_DEVICE_PORT:-8710}}"
 device_sn="${device_sn:-${CONTAINER_DEVICE_SN:-}}"
+task_type="${task_type:-${CONTAINER_TASK_TYPE:-UT}}"
+test_part="${test_part:-${CONTAINER_TEST_PART:-}}"
 test_module="${test_module:-${CONTAINER_TEST_MODULE:-}}"
 test_suite_name="${test_suite_name:-${CONTAINER_TEST_SUITE_NAME:-}}"
+test_case_name="${test_case_name:-${CONTAINER_TEST_CASE:-}}"
+coverage_value="${coverage_value:-${CONTAINER_TEST_COVERAGE:-}}"
+random_value="${random_value:-${CONTAINER_TEST_RANDOM:-}}"
+partdeps_value="${partdeps_value:-${CONTAINER_TEST_PARTDEPS:-}}"
+repeat_count="${repeat_count:-${CONTAINER_TEST_REPEAT:-}}"
+history_list="${history_list:-${CONTAINER_TEST_HISTORYLIST:-}}"
+run_history="${run_history:-${CONTAINER_TEST_RUNHISTORY:-}}"
+retry_mode="${retry_mode:-${CONTAINER_TEST_RETRY:-0}}"
 
+validate_test_selection_args
 select_runtime_framework_repo
 ensure_framework_ready
 

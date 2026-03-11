@@ -33,7 +33,12 @@ cp .env.example .env
 
 - `RK3568_IMAGE_URL`：rk3568 镜像下载地址（自动模式可选）
 - `TDD_CASES_URL`：TDD 用例包下载地址（自动模式可选）
+- `TASK_TYPE`：测试类型，例如 `UT`、`MST`、`ST`、`PERF`、`FUZZ`、`BENCHMARK`
+- `TEST_PART` / `TEST_MODULE`：部件和模块；模块需结合部件使用
 - `TEST_SUITE_NAME`：测试套名字（例如 `unittest`）
+- `TEST_CASE`：测试用例；需结合 `TEST_SUITE_NAME` 使用
+- `TEST_COVERAGE` / `TEST_RANDOM` / `TEST_PARTDEPS`：对应 `-cov`、`-ra`、`-pd` 参数
+- `TEST_REPEAT` / `TEST_HISTORYLIST` / `TEST_RUNHISTORY` / `TEST_RETRY`：对应 `--repeat`、`-hl`、`-rh`、`--retry`
 - `HDC_URL`：hdc 二进制或压缩包下载地址（可选）
 - `HDC_BINARY_PATH`：容器内已有 hdc/hdc_std 路径（可选）
 - `PRODUCT_FORM`：产品形态，默认 `rk3568`
@@ -159,6 +164,21 @@ docker compose -f docker-compose.env.yml down
 7. 执行 `./start.sh run -p <product> -t <task_type>`，也支持 `--command` 覆盖
 
 如果宿主机挂载的 `TDD/testfwk_developer_test` 仍停留在旧提交，`run_ci_case.sh` 会自动回退到镜像内置的 `testfwk_developer_test` / `xdevice` 执行，避免旧版 `start.sh` 干扰当前跑例。
+
+支持的执行参数：
+
+- `-t, --task-type`
+- `-tp, --test-part`
+- `-tm, --module`
+- `-ts, --suite`
+- `-tc, --test-case`
+- `-cov, --coverage`
+- `-ra, --random`
+- `-pd, --partdeps`
+- `--repeat`
+- `-hl, --history-list`
+- `-rh, --run-history`
+- `--retry`
 
 ## 方式二：自动执行测试套
 

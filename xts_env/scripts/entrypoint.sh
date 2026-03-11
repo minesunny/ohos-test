@@ -10,6 +10,17 @@ die() {
   exit 1
 }
 
+is_positive_integer() {
+  [[ "$1" =~ ^[1-9][0-9]*$ ]]
+}
+
+is_truthy() {
+  case "${1,,}" in
+    1|true|yes|y|on) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 git_repo() {
   local repo_dir="$1"
   shift
@@ -298,9 +309,20 @@ TEST_IMAGE_DIR="${TEST_IMAGE_DIR:-${WORK_ROOT}/images}"
 REPORTS_DIR="${REPORTS_DIR:-${TDD_ROOT}/testfwk_developer_test/reports}"
 DOWNLOAD_ROOT="${DOWNLOAD_ROOT:-${WORK_ROOT}/downloads}"
 PRODUCT_FORM="${PRODUCT_FORM:-rk3568}"
+TASK_TYPE="${TASK_TYPE:-UT}"
 RK3568_IMAGE_URL="${RK3568_IMAGE_URL:-}"
 TDD_CASES_URL="${TDD_CASES_URL:-}"
+TEST_PART="${TEST_PART:-}"
+TEST_MODULE="${TEST_MODULE:-}"
 TEST_SUITE_NAME="${TEST_SUITE_NAME:-}"
+TEST_CASE="${TEST_CASE:-}"
+TEST_COVERAGE="${TEST_COVERAGE:-}"
+TEST_RANDOM="${TEST_RANDOM:-}"
+TEST_PARTDEPS="${TEST_PARTDEPS:-}"
+TEST_REPEAT="${TEST_REPEAT:-}"
+TEST_HISTORYLIST="${TEST_HISTORYLIST:-}"
+TEST_RUNHISTORY="${TEST_RUNHISTORY:-}"
+TEST_RETRY="${TEST_RETRY:-0}"
 HDC_URL="${HDC_URL:-}"
 HDC_BINARY_PATH="${HDC_BINARY_PATH:-}"
 DEV_REPO_URL="${DEV_REPO_URL:-https://gitcode.com/openharmony/testfwk_developer_test.git}"
@@ -395,13 +417,59 @@ fi
 
 cd "${TDD_ROOT}/testfwk_developer_test"
 
+validate_test_selection_args() {
+  if [[ -n "${TEST_MODULE}" && -z "${TEST_PART}" ]]; then
+    die "-tm requires -tp in auto mode."
+  fi
+  if [[ -n "${TEST_CASE}" && -z "${TEST_SUITE_NAME}" ]]; then
+    die "-tc requires -ts in auto mode."
+  fi
+  if [[ -n "${TEST_REPEAT}" ]] && ! is_positive_integer "${TEST_REPEAT}"; then
+    die "--repeat must be a positive integer."
+  fi
+  if [[ -n "${TEST_HISTORYLIST}" ]] && ! is_positive_integer "${TEST_HISTORYLIST}"; then
+    die "-hl must be a positive integer."
+  fi
+  if [[ -n "${TEST_RUNHISTORY}" ]] && ! is_positive_integer "${TEST_RUNHISTORY}"; then
+    die "-rh must be a positive integer."
+  fi
+}
+
 run_default() {
-  local args=(run -p "${PRODUCT_FORM}")
+  local args=(run -p "${PRODUCT_FORM}" -t "${TASK_TYPE}")
+  validate_test_selection_args
+  if [[ -n "${TEST_PART:-}" ]]; then
+    args+=(-tp "${TEST_PART}")
+  fi
   if [[ -n "${TEST_MODULE:-}" ]]; then
     args+=(-tm "${TEST_MODULE}")
   fi
   if [[ -n "${TEST_SUITE_NAME:-}" ]]; then
     args+=(-ts "${TEST_SUITE_NAME}")
+  fi
+  if [[ -n "${TEST_CASE:-}" ]]; then
+    args+=(-tc "${TEST_CASE}")
+  fi
+  if [[ -n "${TEST_COVERAGE:-}" ]]; then
+    args+=(-cov "${TEST_COVERAGE}")
+  fi
+  if [[ -n "${TEST_RANDOM:-}" ]]; then
+    args+=(-ra "${TEST_RANDOM}")
+  fi
+  if [[ -n "${TEST_PARTDEPS:-}" ]]; then
+    args+=(-pd "${TEST_PARTDEPS}")
+  fi
+  if [[ -n "${TEST_REPEAT:-}" ]]; then
+    args+=(--repeat "${TEST_REPEAT}")
+  fi
+  if [[ -n "${TEST_HISTORYLIST:-}" ]]; then
+    args+=(-hl "${TEST_HISTORYLIST}")
+  fi
+  if [[ -n "${TEST_RUNHISTORY:-}" ]]; then
+    args+=(-rh "${TEST_RUNHISTORY}")
+  fi
+  if is_truthy "${TEST_RETRY:-0}"; then
+    args+=(--retry)
   fi
   exec ./start.sh "${args[@]}"
 }
