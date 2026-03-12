@@ -1366,7 +1366,8 @@ update_user_config_in_container() {
 }
 
 build_default_test_command() {
-  local cmd="./start.sh run -p $(shell_quote "${product_form}") -t $(shell_quote "${task_type}")"
+  local test_repo_dir="$1"
+  local cmd="python3 /opt/tdd-tools/run_framework.py $(shell_quote "${test_repo_dir}") run -p $(shell_quote "${product_form}") -t $(shell_quote "${task_type}")"
   if [[ -n "${test_part}" ]]; then
     cmd+=" -tp $(shell_quote "${test_part}")"
   fi
@@ -1412,7 +1413,7 @@ run_in_container() {
   if [[ -n "${custom_command}" ]]; then
     run_cmd="${custom_command}"
   else
-    run_cmd="$(build_default_test_command)"
+    run_cmd="$(build_default_test_command "${test_repo_dir}")"
   fi
 
   run_script+=$'set -euo pipefail\n'

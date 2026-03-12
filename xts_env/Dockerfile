@@ -143,6 +143,7 @@ COPY tools/flash/upgrade_tool_v2.17.zip /opt/tools/flash/upgrade_tool_v2.17.zip
 COPY scripts/entrypoint.sh /usr/local/bin/tdd-entrypoint
 COPY scripts/configure_user_config.py /opt/tdd-tools/configure_user_config.py
 COPY scripts/download_and_unpack.py /opt/tdd-tools/download_and_unpack.py
+COPY scripts/run_framework.py /opt/tdd-tools/run_framework.py
 
 RUN python - <<'PY'
 from pathlib import Path
@@ -161,6 +162,7 @@ RUN chmod +x \
     /opt/tools/hdc/hdc \
     /opt/tools/flash/flash.sh \
     /opt/tools/flash/upgrade_tool_v2.17/upgrade_tool_v2.17_for_linux/upgrade_tool \
+    /opt/tdd-tools/run_framework.py \
     /usr/local/bin/tdd-entrypoint && \
     ln -sf /usr/lib/x86_64-linux-gnu/libatomic.so.1.2.0 /usr/lib/x86_64-linux-gnu/libatomic.so.1 && \
     ln -sf /opt/tools/hdc/hdc /usr/local/bin/hdc && \

@@ -555,7 +555,7 @@ run_default() {
   if is_truthy "${TEST_RETRY:-0}"; then
     args+=(--retry)
   fi
-  run_and_report ./start.sh "${args[@]}"
+  run_and_report python3 /opt/tdd-tools/run_framework.py "${TDD_ROOT}/testfwk_developer_test" "${args[@]}"
 }
 
 if [[ "$#" -eq 0 ]]; then
@@ -566,7 +566,7 @@ case "$1" in
   run)
     shift
     if [[ "$#" -gt 0 ]]; then
-      run_and_report ./start.sh run -p "${PRODUCT_FORM}" "$@"
+      run_and_report python3 /opt/tdd-tools/run_framework.py "${TDD_ROOT}/testfwk_developer_test" run -p "${PRODUCT_FORM}" "$@"
       exit $?
     fi
     run_default
