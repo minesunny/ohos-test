@@ -10,6 +10,16 @@ die() {
   exit 1
 }
 
+print_highlight() {
+  local color_code="$1"
+  shift
+  if [[ -n "${NO_COLOR:-}" ]]; then
+    printf '%s\n' "$*"
+  else
+    printf '\033[%sm%s\033[0m\n' "${color_code}" "$*"
+  fi
+}
+
 usage() {
   cat <<'EOF'
 用法:
@@ -1191,6 +1201,32 @@ count_files_in_dir() {
   find "${target_dir}" -type f | wc -l | tr -d ' '
 }
 
+latest_report_path() {
+  local reports_dir="$1"
+  [[ -d "${reports_dir}" ]] || return 0
+  find "${reports_dir}" -mindepth 1 -maxdepth 1 \( -type d -o -type f -o -type l \) \
+    ! -name latest \
+    -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n 1 | cut -d' ' -f2-
+}
+
+print_result_paths() {
+  local host_reports_dir="${REPORTS_HOST_DIR:-}"
+  local container_reports_dir="${ACTIVE_REPORTS_DIR:-${REPORTS_DIR:-}}"
+  local latest_path=""
+
+  print_highlight "1;36" "[ci-case] ===== Execution Results ====="
+  if [[ -n "${host_reports_dir}" ]]; then
+    print_highlight "1;33" "[ci-case] Host reports: ${host_reports_dir}"
+    latest_path="$(latest_report_path "${host_reports_dir}")"
+    if [[ -n "${latest_path}" ]]; then
+      print_highlight "1;32" "[ci-case] Latest result: ${latest_path}"
+    fi
+  fi
+  if [[ -n "${container_reports_dir}" ]]; then
+    print_highlight "1;34" "[ci-case] Container reports: ${container_reports_dir}"
+  fi
+}
+
 verify_prepared_mounts() {
   local tests_count image_count image_loader
 
@@ -1416,4 +1452,11 @@ ensure_framework_ready
 run_id="$(date +%Y%m%d-%H%M%S)-$$"
 prepare_artifacts "${image_artifact_url}" "${tdd_artifact_url}" "${run_id}"
 update_user_config_in_container
-run_in_container
+run_status=0
+if run_in_container; then
+  run_status=0
+else
+  run_status=$?
+fi
+print_result_paths
+exit "${run_status}"

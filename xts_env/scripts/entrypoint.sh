@@ -10,6 +10,16 @@ die() {
   exit 1
 }
 
+print_highlight() {
+  local color_code="$1"
+  shift
+  if [[ -n "${NO_COLOR:-}" ]]; then
+    printf '%s\n' "$*"
+  else
+    printf '\033[%sm%s\033[0m\n' "${color_code}" "$*"
+  fi
+}
+
 is_positive_integer() {
   [[ "$1" =~ ^[1-9][0-9]*$ ]]
 }
@@ -435,6 +445,35 @@ validate_test_selection_args() {
   fi
 }
 
+latest_report_path() {
+  local reports_dir="$1"
+  [[ -d "${reports_dir}" ]] || return 0
+  find "${reports_dir}" -mindepth 1 -maxdepth 1 \( -type d -o -type f -o -type l \) \
+    ! -name latest \
+    -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n 1 | cut -d' ' -f2-
+}
+
+print_result_paths() {
+  local latest_path=""
+  print_highlight "1;36" "[tdd] ===== Execution Results ====="
+  print_highlight "1;33" "[tdd] Reports: ${REPORTS_DIR}"
+  latest_path="$(latest_report_path "${REPORTS_DIR}")"
+  if [[ -n "${latest_path}" ]]; then
+    print_highlight "1;32" "[tdd] Latest result: ${latest_path}"
+  fi
+}
+
+run_and_report() {
+  local rc=0
+  if "$@"; then
+    rc=0
+  else
+    rc=$?
+  fi
+  print_result_paths
+  return "${rc}"
+}
+
 run_default() {
   local args=(run -p "${PRODUCT_FORM}" -t "${TASK_TYPE}")
   validate_test_selection_args
@@ -471,7 +510,7 @@ run_default() {
   if is_truthy "${TEST_RETRY:-0}"; then
     args+=(--retry)
   fi
-  exec ./start.sh "${args[@]}"
+  run_and_report ./start.sh "${args[@]}"
 }
 
 if [[ "$#" -eq 0 ]]; then
@@ -482,7 +521,8 @@ case "$1" in
   run)
     shift
     if [[ "$#" -gt 0 ]]; then
-      exec ./start.sh run -p "${PRODUCT_FORM}" "$@"
+      run_and_report ./start.sh run -p "${PRODUCT_FORM}" "$@"
+      exit $?
     fi
     run_default
     ;;
