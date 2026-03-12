@@ -62,6 +62,13 @@ loader_output() {
     run_upgrade_tool ld 2>/dev/null || true
 }
 
+hdc_targets_output() {
+    if ! command -v hdc >/dev/null 2>&1; then
+        return 1
+    fi
+    hdc list targets -v 2>/dev/null || true
+}
+
 run_upgrade_tool() {
     if [ "$(id -u)" = "0" ]; then
         "${UPGRADE_TOOL}" "$@"
@@ -134,6 +141,48 @@ wait_for_loader() {
     
     echo ""
     echo "❌ 超时: 设备未进入Loader模式"
+    return 1
+}
+
+hdc_device_ready() {
+    local output
+    output="$(hdc_targets_output)"
+    if [ -z "${output}" ]; then
+        return 1
+    fi
+
+    if [ -n "${DEVICE_SN}" ]; then
+        echo "${output}" | grep -q "${DEVICE_SN}" || return 1
+    fi
+
+    echo "${output}" | grep -Eiq '\b(Connected|device)\b'
+}
+
+wait_for_hdc_device() {
+    if ! command -v hdc >/dev/null 2>&1; then
+        echo "⚠️  未找到 hdc，跳过开机后设备在线检查"
+        return 0
+    fi
+
+    echo "等待设备回到 hdc 在线状态..."
+    local max_retries=180
+    local retry_count=0
+
+    while [ "${retry_count}" -lt "${max_retries}" ]; do
+        if hdc_device_ready; then
+            echo "✅ 设备已回到 hdc 在线状态"
+            return 0
+        fi
+
+        echo -n "."
+        sleep 1
+        retry_count=$((retry_count + 1))
+    done
+
+    echo ""
+    echo "❌ 超时: 设备未回到 hdc 在线状态"
+    echo "[diag] hdc list targets -v:"
+    hdc_targets_output || true
     return 1
 }
 
@@ -288,6 +337,7 @@ main() {
     echo "4. 重启设备..."
     if run_upgrade_tool rd 2>&1; then
         echo "🎉 刷机完成！设备正在重启..."
+        wait_for_hdc_device || exit 1
     else
         echo "⚠️  重启命令发送失败，请手动重启设备"
     fi

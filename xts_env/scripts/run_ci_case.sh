@@ -1365,6 +1365,26 @@ update_user_config_in_container() {
   docker exec "${CONTAINER_REF}" bash -lc "${cmd}"
 }
 
+ensure_runtime_tools_in_container() {
+  local tools_dir="/opt/tdd-tools"
+  local local_configure="${SCRIPT_DIR}/configure_user_config.py"
+  local local_runner="${SCRIPT_DIR}/run_framework.py"
+
+  docker exec "${CONTAINER_REF}" mkdir -p "${tools_dir}"
+
+  if [[ -f "${local_configure}" ]]; then
+    docker cp "${local_configure}" "${CONTAINER_REF}:${tools_dir}/configure_user_config.py"
+  fi
+
+  if [[ -f "${local_runner}" ]]; then
+    docker cp "${local_runner}" "${CONTAINER_REF}:${tools_dir}/run_framework.py"
+  fi
+
+  docker exec "${CONTAINER_REF}" chmod 755 \
+    "${tools_dir}/configure_user_config.py" \
+    "${tools_dir}/run_framework.py"
+}
+
 build_default_test_command() {
   local test_repo_dir="$1"
   local cmd="python3 /opt/tdd-tools/run_framework.py $(shell_quote "${test_repo_dir}") run -p $(shell_quote "${product_form}") -t $(shell_quote "${task_type}")"
@@ -1438,6 +1458,7 @@ run_in_container() {
   run_script+=$'}\n'
   if [[ "${skip_flash}" -eq 0 ]]; then
     run_script+=$'print_flash_diagnostics\n'
+    run_script+=$'export XDEVICE_DISCOVERY_TIMEOUT="${XDEVICE_DISCOVERY_TIMEOUT:-60}"\n'
     run_script+="echo '[ci-case] Flash image from ${TEST_IMAGE_DIR}'"$'\n'
     run_script+="/opt/tools/flash/flash.sh $(shell_quote "${TEST_IMAGE_DIR}")"$'\n'
   fi
@@ -1497,6 +1518,7 @@ ensure_framework_ready
 
 run_id="$(date +%Y%m%d-%H%M%S)-$$"
 prepare_artifacts "${image_artifact_url}" "${tdd_artifact_url}" "${run_id}"
+ensure_runtime_tools_in_container
 update_user_config_in_container
 run_status=0
 if run_in_container; then
