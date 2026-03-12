@@ -1206,20 +1206,65 @@ latest_report_path() {
   [[ -d "${reports_dir}" ]] || return 0
   find "${reports_dir}" -mindepth 1 -maxdepth 1 \( -type d -o -type f -o -type l \) \
     ! -name latest \
+    ! -name '*.zip' \
     -printf '%T@ %p\n' 2>/dev/null | sort -nr | head -n 1 | cut -d' ' -f2-
+}
+
+archive_report_path() {
+  local source_path="$1"
+  [[ -n "${source_path}" ]] || return 0
+
+  python3 - "${source_path}" <<'PY'
+import pathlib
+import shutil
+import sys
+import zipfile
+
+source = pathlib.Path(sys.argv[1])
+if not source.exists():
+    sys.exit(0)
+
+if source.suffix == ".zip":
+    print(source)
+    sys.exit(0)
+
+zip_path = source.with_suffix(".zip")
+if zip_path.exists():
+    zip_path.unlink()
+
+if source.is_dir():
+    archive_path = shutil.make_archive(
+        str(zip_path.with_suffix("")),
+        "zip",
+        root_dir=str(source.parent),
+        base_dir=source.name,
+    )
+else:
+    with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.write(source, arcname=source.name)
+    archive_path = str(zip_path)
+
+print(archive_path)
+PY
 }
 
 print_result_paths() {
   local host_reports_dir="${REPORTS_HOST_DIR:-}"
   local container_reports_dir="${ACTIVE_REPORTS_DIR:-${REPORTS_DIR:-}}"
   local latest_path=""
+  local archived_path=""
 
   print_highlight "1;36" "[ci-case] ===== Execution Results ====="
   if [[ -n "${host_reports_dir}" ]]; then
     print_highlight "1;33" "[ci-case] Host reports: ${host_reports_dir}"
     latest_path="$(latest_report_path "${host_reports_dir}")"
     if [[ -n "${latest_path}" ]]; then
-      print_highlight "1;32" "[ci-case] Latest result: ${latest_path}"
+      archived_path="$(archive_report_path "${latest_path}")"
+      if [[ -n "${archived_path}" ]]; then
+        print_highlight "1;32" "[ci-case] Latest result: ${archived_path}"
+      else
+        print_highlight "1;32" "[ci-case] Latest result: ${latest_path}"
+      fi
     fi
   fi
   if [[ -n "${container_reports_dir}" ]]; then
